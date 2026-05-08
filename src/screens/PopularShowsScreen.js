@@ -1,11 +1,11 @@
 import * as React from 'react';
-import {View, Text, Image, ScrollView, Pressable} from 'react-native';
+import {View, Image, ScrollView, Pressable} from 'react-native';
 import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
 import useMainState from '../state/Main';
-import {Button, Headline, IconButton, Paragraph} from 'react-native-paper';
+import {Button, Headline, IconButton, Paragraph, Text} from 'react-native-paper';
 
 const PopularShowsScreen = () => {
   const [series, setSeries] = React.useState([]);

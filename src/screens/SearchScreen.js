@@ -1,7 +1,7 @@
-import {Image, Pressable, ScrollView, Text, View} from 'react-native';
+import {Image, Pressable, ScrollView, View} from 'react-native';
 import React, {Component} from 'react';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Appbar, Badge, Searchbar} from 'react-native-paper';
+import {Appbar, Badge, Searchbar, Text} from 'react-native-paper';
 import {MovieDb} from 'moviedb-promise';
 import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';

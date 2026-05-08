@@ -1,11 +1,11 @@
 import * as React from 'react';
-import {View, Text, Image, Pressable} from 'react-native';
+import {View, Image, Pressable} from 'react-native';
 import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
 import useMainState from '../state/Main';
-import {Button, Paragraph} from 'react-native-paper';
+import {Button, Paragraph, Text} from 'react-native-paper';
 
 const TopRatedMoviesScreen = () => {
   const [movies, setMovies] = React.useState([]);
