@@ -137,7 +137,6 @@ class SubtitleManager {
   }
 
   async fetchSubtitleLinks(imdbId, lang) {
-    debugger
     const langId = lang;
     const url = `https://opensubtitles.org/en/search/sublanguageid-${langId}/imdbid-${imdbId}`;
     try {

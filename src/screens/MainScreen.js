@@ -1,11 +1,11 @@
 import * as React from 'react';
-import {View, Text, Image, ScrollView, Pressable, FlatList} from 'react-native';
+import {View, Image, ScrollView, Pressable, FlatList} from 'react-native';
 import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
 import useMainState from '../state/Main';
-import {Badge, Button, Headline, IconButton} from 'react-native-paper';
+import {Badge, Button, Headline, IconButton, Text} from 'react-native-paper';
 
 import Carousel from 'react-native-reanimated-carousel';
 import {Dimensions} from 'react-native';
@@ -243,7 +243,7 @@ const RenderCard = ({item}) => {
           style={{
             padding: 5,
             overflow: 'scroll',
-            height: 80,
+            height: 60,
             textAlignVertical: 'center',
           }}>
           {item.title} ({item.year})
