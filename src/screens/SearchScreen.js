@@ -87,12 +87,12 @@ const RenderCard = ({ item }) => {
   const navigation = useNavigation();
 
   return (
-    <Pressable
+      <Pressable
       onPress={() => {
         if (item.type === 'movie') {
-          navigation.navigate('MovieDetail', { movie: item });
+          navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item } });
         } else {
-          navigation.navigate('SerieDetail', { serie: item });
+          navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item } });
         }
       }}>
       <View
