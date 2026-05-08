@@ -1,15 +1,17 @@
-import {Image, Pressable, ScrollView, View} from 'react-native';
-import React, {Component} from 'react';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Appbar, Badge, Searchbar, Text} from 'react-native-paper';
-import {MovieDb} from 'moviedb-promise';
-import {FlatGrid} from 'react-native-super-grid';
-import {useNavigation} from '@react-navigation/native';
+import { Image, Pressable, ScrollView, View } from 'react-native';
+import React, { Component } from 'react';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Appbar, Badge, Text } from 'react-native-paper';
+import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
+import { MovieDb } from 'moviedb-promise';
+import { FlatGrid } from 'react-native-super-grid';
+import { useNavigation } from '@react-navigation/native';
 
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
+  const refSearchBox = React.useRef();
   const [searchResults, setSearchResults] = React.useState([]);
 
   const [page, setPage] = React.useState(1);
@@ -50,46 +52,47 @@ const SearchScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{paddingBottom: 50}}>
-      <Appbar.Header>
-        <Searchbar
-          placeholder="Search"
-          autoFocus
-          autoCapitalize="none"
-          onChangeText={setSearchQuery}
-          onSubmitEditing={async () => {
-            setPage(1);
-            setSearchResults([]);
-            await search(true);
-          }}
-        />
-      </Appbar.Header>
+    <SafeAreaView style={{ paddingBottom: 50 }}>
+
+      <ReactNativeAnimatedSearchbox
+        ref={refSearchBox}
+        placeholder={"Search..."}
+        value={searchQuery}
+        onChangeText={text => setSearchQuery(text)}
+        onSubmitEditing={async () => {
+          setPage(1);
+          setSearchResults([]);
+          await search(true);
+        }}
+        focusAfterOpened={true}
+        onOpened={() => { }}
+      />
       <FlatGrid
         data={searchResults}
         onEndReached={() => {
           setPage(page + 1);
           search();
         }}
-        renderItem={({item}) => {
+        renderItem={({ item }) => {
           return <RenderCard item={item} />;
         }}
         itemDimension={160}
-        contentContainerStyle={{alignContent: 'center'}}
+        contentContainerStyle={{ alignContent: 'center' }}
       />
     </SafeAreaView>
   );
 };
 
-const RenderCard = ({item}) => {
+const RenderCard = ({ item }) => {
   const navigation = useNavigation();
 
   return (
     <Pressable
       onPress={() => {
         if (item.type === 'movie') {
-          navigation.navigate('MovieDetail', {movie: item});
+          navigation.navigate('MovieDetail', { movie: item });
         } else {
-          navigation.navigate('SerieDetail', {serie: item});
+          navigation.navigate('SerieDetail', { serie: item });
         }
       }}>
       <View
@@ -104,7 +107,7 @@ const RenderCard = ({item}) => {
           source={{
             uri: item.image,
           }}
-          style={{width: '100%', height: 200}}
+          style={{ width: '100%', height: 200 }}
         />
         <Text
           style={{

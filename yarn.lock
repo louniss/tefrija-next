@@ -5770,7 +5770,7 @@ prompts@^2.0.1, prompts@^2.4.2:
     kleur "^3.0.3"
     sisteransi "^1.0.5"
 
-prop-types@^15.8.1:
+prop-types@^15.7.2, prop-types@^15.8.1:
   version "15.8.1"
   resolved "https://registry.yarnpkg.com/prop-types/-/prop-types-15.8.1.tgz#67d87bf1a694f48435cf332c24af10214a3140b5"
   integrity sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==
@@ -5875,6 +5875,13 @@ react-is@^19.1.0, react-is@^19.2.3:
   version "19.2.6"
   resolved "https://registry.yarnpkg.com/react-is/-/react-is-19.2.6.tgz#aeee6159b159eb7f520d672cffcc69e7052d288f"
   integrity sha512-XjBR15BhXuylgWGuslhDKqlSayuqvqBX91BP8pauG8kd1zY8kotkNWbXksTCNRarse4kuGbe2kIY05ARtwNIvw==
+
+react-native-animated-searchbox@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/react-native-animated-searchbox/-/react-native-animated-searchbox-0.0.1.tgz#b9cd0257925f33063f07a32c7427bee44f9e9c60"
+  integrity sha512-dodBid7K1P3TWiozbeXm0A8xnzHheirE45quPKpqVynYsp+atB1wo0p2w9uWeuX4MN52e2GvFyop2U7axkgDFA==
+  dependencies:
+    prop-types "^15.7.2"
 
 react-native-dotenv@^3.4.11:
   version "3.4.11"

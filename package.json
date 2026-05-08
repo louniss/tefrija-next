@@ -26,6 +26,7 @@
     "moviedb-promise": "^4.0.8",
     "react": "19.2.3",
     "react-native": "0.85.3",
+    "react-native-animated-searchbox": "^0.0.1",
     "react-native-dotenv": "^3.4.11",
     "react-native-fs": "^2.20.0",
     "react-native-gesture-handler": "^2.31.2",
