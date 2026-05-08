@@ -22,9 +22,9 @@ export const FetchVideoComponent = ({
   let src;
 
   if (type === 'movie') {
-    src = `https://vsembed.ru/embed/movie/${id}`;
+    src = `https://vsembed.su/embed/movie/${id}`;
   } else {
-    src = `https://vsembed.ru/embed/tv/${id}/${season}/${episode}`;
+    src = `https://vsembed.su/embed/tv/${id}/${season}/${episode}`;
   }
 
   const [url, setUrl] = useState(src);
@@ -69,6 +69,7 @@ export const FetchVideoComponent = ({
         ref={webview}
         style={{width: 1, height: 1, position: 'absolute'}}
         originWhitelist={['*']}
+        allowsLinkPreview={true}
         source={{
           uri: url,
           headers: {
