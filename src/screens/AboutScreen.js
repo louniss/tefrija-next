@@ -17,7 +17,7 @@ const AboutScreen = () => {
         <Card.Content>
           <Subheading>Software Version</Subheading>
           <Divider style={styles.divider} />
-          <Caption>Version: 0.1.6</Caption>
+          <Caption>Version: 0.1.9</Caption>
         </Card.Content>
       </Card>
     </ScrollView>

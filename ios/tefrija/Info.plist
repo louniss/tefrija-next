@@ -29,8 +29,6 @@
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
-		<false/>
-		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
@@ -61,6 +59,10 @@
 	<key>UIAppFonts</key>
 	<array>
 		<string>MaterialDesignIcons.ttf</string>
+	</array>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>about</string>
 	</array>
 </dict>
 </plist>

@@ -9,7 +9,7 @@ import {
   Paragraph,
 } from 'react-native-paper';
 
-const CURRENT_VERSION = '0.1.4';
+const CURRENT_VERSION = '0.1.9';
 
 const UpdatesScreen = () => {
   const [loading, setLoading] = useState(false);
