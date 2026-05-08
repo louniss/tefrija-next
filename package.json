@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "^3.0.2",
+    "@react-native-community/slider": "^5.2.0",
     "@react-native-cookies/cookies": "^6.2.1",
     "@react-native-vector-icons/material-design-icons": "^13.1.1",
     "@react-native/new-app-screen": "0.85.3",
@@ -22,6 +23,7 @@
     "axios": "^1.16.0",
     "delay": "^7.0.0",
     "graphql-ws": "^6.0.8",
+    "jsdom-jscore-rn": "^0.1.9",
     "moviedb-promise": "^4.0.8",
     "react": "19.2.3",
     "react-native": "0.85.3",
