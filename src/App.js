@@ -99,7 +99,8 @@ const Main = () => {
         <Drawer.Screen
           name="Search"
           options={{
-            title: 'Search',
+              title: 'Search',
+              headerShown: false,
             drawerLabel: 'Search',
             drawerIcon: () => (
               <IconButton

@@ -1,7 +1,7 @@
 import { Image, Pressable, ScrollView, View } from 'react-native';
 import React, { Component } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Appbar, Badge, Text } from 'react-native-paper';
+import { Appbar, Badge, Text, IconButton } from 'react-native-paper';
 import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
 import { FlatGrid } from 'react-native-super-grid';
@@ -53,20 +53,31 @@ const SearchScreen = () => {
 
   return (
     <SafeAreaView style={{ paddingBottom: 50 }}>
-
-      <ReactNativeAnimatedSearchbox
-        ref={refSearchBox}
-        placeholder={"Search..."}
-        value={searchQuery}
-        onChangeText={text => setSearchQuery(text)}
-        onSubmitEditing={async () => {
-          setPage(1);
-          setSearchResults([]);
-          await search(true);
-        }}
-        focusAfterOpened={true}
-        onOpened={() => { }}
-      />
+      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
+        <IconButton
+          icon="menu"
+          size={24}
+          onPress={() => {
+            navigation.openDrawer();
+          }}
+          style={{ margin: 0 }}
+        />
+        <View style={{ flex: 1 }}>
+          <ReactNativeAnimatedSearchbox
+            ref={refSearchBox}
+            placeholder={"Search..."}
+            value={searchQuery}
+            onChangeText={text => setSearchQuery(text)}
+            onSubmitEditing={async () => {
+              setPage(1);
+              setSearchResults([]);
+              await search(true);
+            }}
+            focusAfterOpened={true}
+            onOpened={() => { }}
+          />
+        </View>
+      </View>
       <FlatGrid
         data={searchResults}
         onEndReached={() => {
