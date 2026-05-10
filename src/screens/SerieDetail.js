@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Button, Caption, Divider, Menu, Subheading, IconButton} from 'react-native-paper';
+import {Button, Caption, Divider, Menu, Subheading} from 'react-native-paper';
 
 import {
   FlatList,
@@ -15,35 +15,56 @@ import useMainState from '../state/Main';
 
 const SerieDetails = ({navigation, route}) => {
   const {serie} = route.params;
-  const fromSearch = route.params?.fromSearch;
   const [episodes, setEpisodes] = useState([]);
-  const [season, setSeason] = useState(serie.season || 1);
-  const [episode, setEpisode] = useState(serie.episode || 1);
+  const [season, setSeason] = useState(serie?.season || 1);
+  const [episode, setEpisode] = useState(serie?.episode || 1);
   const [seasons, setSeasons] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   const [menuVisible, setMenuVisible] = useState(false);
 
   const state = useMainState();
 
+  // Load show overview (seasons) when serie changes
   useEffect(() => {
-    const s = moviedb.tvInfo({
-      id: serie.id,
-      append_to_response: 'seasons',
-    });
-    s.then(res => {
-      setSeasons(res.seasons.length);
-      serie.image = `https://image.tmdb.org/t/p/w500/${res.poster_path}`;
-      const e = moviedb
-        .seasonInfo({
-          id: serie.id,
-          season_number: season,
-          append_to_response: 'episodes',
-        })
-        .then(res => {
-          setEpisodes(res.episodes);
-        });
-    });
-  }, [season, serie.id, navigation]);
+    if (!serie?.id) return;
+    setLoading(true);
+    setSeasons([]);
+    // don't mutate route params; compute image separately
+    moviedb
+      .tvInfo({id: serie.id, append_to_response: 'seasons'})
+      .then(res => {
+        setSeasons(res.seasons.length || 0);
+        // prefill serie.image if it wasn't provided
+        if (!serie.image && res.poster_path) {
+          serie.image = `https://image.tmdb.org/t/p/w500/${res.poster_path}`;
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [serie?.id]);
+
+  // Load episodes when season or serie changes
+  useEffect(() => {
+    if (!serie?.id) return;
+    setEpisodes([]);
+    setLoading(true);
+    moviedb
+      .seasonInfo({id: serie.id, season_number: season, append_to_response: 'episodes'})
+      .then(res => {
+        setEpisodes(res.episodes || []);
+      })
+      .catch(() => setEpisodes([]))
+      .finally(() => setLoading(false));
+  }, [season, serie?.id]);
+
+  // Reset local navigation state when switching to a different serie
+  useEffect(() => {
+    setSeason(serie?.season || 1);
+    setEpisode(serie?.episode || 1);
+    setSeasons([]);
+    setEpisodes([]);
+  }, [serie?.id]);
 
   const EpisodeItem = ({episode, s, navigation}) => {
     const state = useMainState();
@@ -89,10 +110,10 @@ const SerieDetails = ({navigation, route}) => {
           />
           <Caption style={{padding: 10}}>{episode.episode_number}</Caption>
           <Caption style={{padding: 10}}>{episode.name}</Caption>
-          const [episodes, setEpisodes] = useState([]);
-          const [season, setSeason] = useState(serie?.season || 1);
-          const [episode, setEpisode] = useState(serie?.episode || 1);
-          const [seasons, setSeasons] = useState([]);
+        </View>
+        <Divider />
+      </TouchableOpacity>
+    );
   };
 
   const continueWatching = state.getById(serie.id);
@@ -100,30 +121,11 @@ const SerieDetails = ({navigation, route}) => {
   return (
     <ScrollView>
       <Image source={{uri: serie.image}} style={{width: '100%', height: 200}} />
-      <IconButton
-        icon="arrow-left"
-        mode="contained-tonal"
-        onPress={() => {
-          if (fromSearch) {
-            navigation.navigate('Search');
-          } else {
-            navigation.goBack();
-          }
-        }}
-        style={{position: 'absolute', left: 0, top: 0}}
-      />
       <Subheading style={{padding: 10}}>
         {serie.title} ({serie.year})
       </Subheading>
       {continueWatching ? (
         <Button
-          // reset local season/episode/episodes when serie changes
-          useEffect(() => {
-            setSeason(serie?.season || 1);
-            setEpisode(serie?.episode || 1);
-            setSeasons([]);
-            setEpisodes([]);
-          }, [serie?.id]);
           onPress={() => {
             navigation.navigate('VideoPlayer', {
               id: continueWatching.id,
