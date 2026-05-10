@@ -6,7 +6,7 @@ import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
 import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation } from '@react-navigation/native';
-
+import { JSDOM } from 'jsdom';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
 const SearchScreen = () => {
@@ -15,6 +15,8 @@ const SearchScreen = () => {
   const [searchResults, setSearchResults] = React.useState([]);
   const [searchLoading, setSearchLoading] = React.useState(false);
   const [hasSearched, setHasSearched] = React.useState(false);
+  const [suggestion, setSuggestion] = React.useState(null);
+  const [suggestionLoading, setSuggestionLoading] = React.useState(false);
 
   const [page, setPage] = React.useState(1);
 
@@ -61,6 +63,48 @@ const SearchScreen = () => {
       setSearchLoading(false);
     }
   };
+
+  // Try to fetch a "did you mean" suggestion from Yahoo when no results
+  React.useEffect(() => {
+    let cancelled = false;
+    if (!hasSearched || !searchQuery || searchQuery.trim().length === 0) {
+      setSuggestion(null);
+      return;
+    }
+
+    const fetchSuggestion = async q => {
+      setSuggestionLoading(true);
+      try {
+        const url = `https://search.yahoo.com/search?p=${encodeURIComponent(q)}`;
+        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+        const html = await resp.text();
+        // parse with jsdom-jscore-rn
+        const dom = new JSDOM(html);
+        const doc = dom.window.document;
+        debugger
+        // Try a few selectors matching Yahoo's suggestion area
+        let el = doc.querySelector('ol.reg.searchSuperTop h4.text-module.u-strong');
+        if (!el) el = doc.querySelector('.searchSuperTop h4');
+        if (!el) el = doc.querySelector('h4.text-module.u-strong');
+        const text = el ? el.textContent.trim() : null;
+        return text;
+      } catch (e) {
+        return null;
+      } finally {
+        if (!cancelled) setSuggestionLoading(false);
+      }
+    };
+
+    (async () => {
+      setSuggestion(null);
+      const s = await fetchSuggestion(searchQuery);
+      if (!cancelled) setSuggestion(s);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery, hasSearched]);
 
   return (
     <SafeAreaView style={{ paddingBottom: 50 }}>
@@ -109,9 +153,45 @@ const SearchScreen = () => {
         </View>
       ) : hasSearched && searchResults.length === 0 ? (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
-            No results for "{searchQuery}".
-          </Text>
+          {suggestionLoading ? (
+            <ActivityIndicator animating={true} />
+          ) : suggestion ? (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 8 }}>
+                Did you mean:
+              </Text>
+              <Pressable
+                onPress={async () => {
+                  setSearchQuery(suggestion);
+                  setHasSearched(true);
+                  setPage(1);
+                  setSearchResults([]);
+                  await search(true, 1);
+                }}
+                style={{ padding: 8 }}>
+                <Text style={{ fontSize: 18, color: '#1a73e8' }}>{suggestion}</Text>
+              </Pressable>
+              <Text style={{ fontSize: 14, color: '#666', marginTop: 12 }}>
+                Or search for "{searchQuery}" anyway
+              </Text>
+              <Pressable
+                onPress={async () => {
+                  setHasSearched(true);
+                  setPage(1);
+                  setSearchResults([]);
+                  await search(true, 1);
+                }}
+                style={{ padding: 8 }}>
+                <Text style={{ color: '#666' }}>Search</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <View>
+              <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
+                No results for "{searchQuery}".
+              </Text>
+            </View>
+          )}
         </View>
       ) : searchResults.length > 0 ? (
         <FlatGrid
