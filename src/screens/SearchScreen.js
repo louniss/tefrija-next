@@ -6,7 +6,6 @@ import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
 import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation } from '@react-navigation/native';
-import { JSDOM } from 'jsdom';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
 const SearchScreen = () => {
@@ -22,12 +21,13 @@ const SearchScreen = () => {
 
   const navigation = useNavigation();
 
-  const search = async (reset, overridePage) => {
+  const search = async (reset, overridePage, overrideQuery) => {
     const p = overridePage ?? page;
+    const q = overrideQuery ?? searchQuery;
     setSearchLoading(true);
     try {
       const res = await moviedb.searchMulti({
-        query: searchQuery,
+        query: q,
         page: p,
       });
 
@@ -63,48 +63,114 @@ const SearchScreen = () => {
       setSearchLoading(false);
     }
   };
-
-  // Try to fetch a "did you mean" suggestion from Yahoo when no results
+  // Clear suggestion when user is typing or hasn't searched
   React.useEffect(() => {
-    let cancelled = false;
     if (!hasSearched || !searchQuery || searchQuery.trim().length === 0) {
       setSuggestion(null);
-      return;
     }
-
-    const fetchSuggestion = async q => {
-      setSuggestionLoading(true);
-      try {
-        const url = `https://search.yahoo.com/search?p=${encodeURIComponent(q)}`;
-        const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-        const html = await resp.text();
-        // parse with jsdom-jscore-rn
-        const dom = new JSDOM(html);
-        const doc = dom.window.document;
-        debugger
-        // Try a few selectors matching Yahoo's suggestion area
-        let el = doc.querySelector('ol.reg.searchSuperTop h4.text-module.u-strong');
-        if (!el) el = doc.querySelector('.searchSuperTop h4');
-        if (!el) el = doc.querySelector('h4.text-module.u-strong');
-        const text = el ? el.textContent.trim() : null;
-        return text;
-      } catch (e) {
-        return null;
-      } finally {
-        if (!cancelled) setSuggestionLoading(false);
-      }
-    };
-
-    (async () => {
-      setSuggestion(null);
-      const s = await fetchSuggestion(searchQuery);
-      if (!cancelled) setSuggestion(s);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
   }, [searchQuery, hasSearched]);
+
+  const fetchSuggestion = async q => {
+    let cancelled = false;
+    setSuggestionLoading(true);
+    console.log('[suggestion] fetchSuggestion start', { q });
+    try {
+      const url = `https://search.yahoo.com/search?p=${encodeURIComponent(q)}`;
+      console.log('[suggestion] fetching URL', url);
+      const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+      console.log('[suggestion] response status', resp && resp.status);
+      const html = await resp.text();
+      console.log('[suggestion] fetched html length', html ? html.length : 0);
+      // parse with jsdom-jscore-rn using the same `jsdom` helper pattern as SubtitleManager
+      let dom;
+      let doc = null;
+      try {
+        const jsdomModule = require('jsdom-jscore-rn');
+        console.log('[suggestion] jsdom-jscore-rn module keys', jsdomModule && Object.keys(jsdomModule));
+
+        const jsdomHelper = jsdomModule && (jsdomModule.jsdom || jsdomModule.jsdomjs || jsdomModule.jsdomHelper || jsdomModule.default || jsdomModule);
+
+        if (!jsdomHelper || typeof jsdomHelper !== 'function') {
+          console.warn('[suggestion] jsdom-jscore-rn does not expose a callable `jsdom`; attempting any callable export');
+          const keys = jsdomModule ? Object.keys(jsdomModule) : [];
+          for (let k of keys) {
+            if (typeof jsdomModule[k] === 'function') {
+              try {
+                console.log('[suggestion] trying callable export', k);
+                dom = jsdomModule[k](html);
+                break;
+              } catch (err) {
+                console.warn('[suggestion] callable export failed', k, err);
+              }
+            }
+          }
+        } else {
+          dom = jsdomHelper(html);
+        }
+
+        if (!dom) {
+          console.error('[suggestion] jsdom-jscore-rn: failed to create dom with available exports');
+          return null;
+        }
+
+        if (dom.querySelector) {
+          doc = dom;
+        } else if (dom.window && dom.window.document) {
+          doc = dom.window.document;
+        } else if (dom.document) {
+          doc = dom.document;
+        }
+
+        if (!doc) {
+          console.error('[suggestion] unable to obtain document from parsed DOM', Object.keys(dom || {}));
+          return null;
+        }
+      } catch (parseErr) {
+        console.error('[suggestion] JSDOM (jsdom-jscore-rn) parse/require error', parseErr && (parseErr.message || parseErr), parseErr && parseErr.stack ? parseErr.stack : parseErr);
+        return null;
+      }
+      // Try a few selectors matching Yahoo's suggestion area (h4 first)
+      let el = doc.querySelector('ol.reg.searchSuperTop h4.text-module.u-strong');
+      console.log('[suggestion] querySelector primary', !!el);
+      if (!el) el = doc.querySelector('.searchSuperTop h4');
+      console.log('[suggestion] querySelector .searchSuperTop h4', !!el);
+      if (!el) el = doc.querySelector('h4.text-module.u-strong');
+      console.log('[suggestion] querySelector fallback h4.text-module.u-strong', !!el);
+
+      let text = null;
+      if (el) {
+        text = el.textContent.trim();
+        console.log('[suggestion] extracted text from h4', text);
+      } else {
+        // Fallback: look for <strong><i> inside .compTitle
+        try {
+          let strongI = doc.querySelector('.compTitle .stxt a strong i');
+          console.log('[suggestion] .compTitle .stxt a strong i', !!strongI);
+          if (!strongI) strongI = doc.querySelector('.compTitle .stxt a strong');
+          console.log('[suggestion] .compTitle .stxt a strong', !!strongI);
+          if (!strongI) {
+            strongI = doc.querySelector('.compTitle .stxt a');
+            console.log('[suggestion] .compTitle .stxt a', !!strongI);
+          }
+
+          if (strongI) {
+            text = strongI.textContent.trim();
+            console.log('[suggestion] extracted text from compTitle strong/i', text);
+          }
+        } catch (ex) {
+          console.warn('[suggestion] compTitle fallback error', ex);
+        }
+      }
+
+      if (!cancelled) setSuggestion(text);
+      return text;
+    } finally {
+      if (!cancelled) {
+        setSuggestionLoading(false);
+        console.log('[suggestion] fetchSuggestion finished, suggestionLoading=false');
+      }
+    }
+  };
 
   return (
     <SafeAreaView style={{ paddingBottom: 50 }}>
@@ -134,13 +200,30 @@ const SearchScreen = () => {
               setPage(1);
               setSearchResults([]);
               setHasSearched(true);
-              await search(true, 1);
+              // Run TMDB search and suggestion fetch in parallel
+              await Promise.all([search(true, 1, searchQuery), fetchSuggestion(searchQuery)]);
             }}
             focusAfterOpened={true}
             onOpened={() => { }}
           />
         </View>
       </View>
+      {/* Suggestion hint shown after a search, above results */}
+      {hasSearched && suggestion ? (
+        <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
+          <Pressable
+            onPress={async () => {
+              setSearchQuery(suggestion);
+              setHasSearched(true);
+              setPage(1);
+              setSearchResults([]);
+              await Promise.all([search(true, 1, suggestion), fetchSuggestion(suggestion)]);
+            }}
+            style={{ padding: 8 }}>
+            <Text style={{ color: '#666' }}>See also <Text style={{ color: '#1a73e8' }}>{suggestion}</Text>?</Text>
+          </Pressable>
+        </View>
+      ) : null}
       {searchQuery.trim().length === 0 ? (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
@@ -166,7 +249,7 @@ const SearchScreen = () => {
                   setHasSearched(true);
                   setPage(1);
                   setSearchResults([]);
-                  await search(true, 1);
+                  await search(true, 1, suggestion);
                 }}
                 style={{ padding: 8 }}>
                 <Text style={{ fontSize: 18, color: '#1a73e8' }}>{suggestion}</Text>
