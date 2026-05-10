@@ -89,10 +89,10 @@ const SerieDetails = ({navigation, route}) => {
           />
           <Caption style={{padding: 10}}>{episode.episode_number}</Caption>
           <Caption style={{padding: 10}}>{episode.name}</Caption>
-        </View>
-        <Divider />
-      </TouchableOpacity>
-    );
+          const [episodes, setEpisodes] = useState([]);
+          const [season, setSeason] = useState(serie?.season || 1);
+          const [episode, setEpisode] = useState(serie?.episode || 1);
+          const [seasons, setSeasons] = useState([]);
   };
 
   const continueWatching = state.getById(serie.id);
@@ -117,6 +117,13 @@ const SerieDetails = ({navigation, route}) => {
       </Subheading>
       {continueWatching ? (
         <Button
+          // reset local season/episode/episodes when serie changes
+          useEffect(() => {
+            setSeason(serie?.season || 1);
+            setEpisode(serie?.episode || 1);
+            setSeasons([]);
+            setEpisodes([]);
+          }, [serie?.id]);
           onPress={() => {
             navigation.navigate('VideoPlayer', {
               id: continueWatching.id,

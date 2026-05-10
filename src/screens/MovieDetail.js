@@ -19,16 +19,17 @@ const MovieDetail = ({navigation, route}) => {
   const state = useMainState();
 
   useEffect(() => {
-    const movie = route.params.movie;
-
-    const details = moviedb
+    const movieParam = route.params?.movie;
+    if (!movieParam) return;
+    setMovie({});
+    moviedb
       .movieInfo({
-        id: movie.id,
+        id: movieParam.id,
       })
       .then(res => {
         setMovie(res);
       });
-  }, [route.params.id]);
+  }, [route.params?.movie?.id]);
 
   const [loading, setLoading] = React.useState(false);
 
