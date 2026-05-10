@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Button, Caption, Divider, Menu, Subheading} from 'react-native-paper';
+import {Button, Caption, Divider, Menu, Subheading, IconButton} from 'react-native-paper';
 
 import {
   FlatList,
@@ -15,6 +15,7 @@ import useMainState from '../state/Main';
 
 const SerieDetails = ({navigation, route}) => {
   const {serie} = route.params;
+  const fromSearch = route.params?.fromSearch;
   const [episodes, setEpisodes] = useState([]);
   const [season, setSeason] = useState(serie.season || 1);
   const [episode, setEpisode] = useState(serie.episode || 1);
@@ -99,6 +100,18 @@ const SerieDetails = ({navigation, route}) => {
   return (
     <ScrollView>
       <Image source={{uri: serie.image}} style={{width: '100%', height: 200}} />
+      <IconButton
+        icon="arrow-left"
+        mode="contained-tonal"
+        onPress={() => {
+          if (fromSearch) {
+            navigation.navigate('Search');
+          } else {
+            navigation.goBack();
+          }
+        }}
+        style={{position: 'absolute', left: 0, top: 0}}
+      />
       <Subheading style={{padding: 10}}>
         {serie.title} ({serie.year})
       </Subheading>

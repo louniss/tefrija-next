@@ -62,7 +62,11 @@ const MovieDetail = ({navigation, route}) => {
         <IconButton
           mode="contained-tonal"
           onPress={() => {
-            navigation.goBack();
+            if (route?.params?.fromSearch) {
+              navigation.navigate('Search');
+            } else {
+              navigation.goBack();
+            }
           }}
           style={styles.absolute}
           icon="arrow-left"

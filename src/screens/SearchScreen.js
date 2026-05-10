@@ -99,11 +99,11 @@ const RenderCard = ({ item }) => {
 
   return (
       <Pressable
-      onPress={() => {
+        onPress={() => {
         if (item.type === 'movie') {
-          navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item } });
+          navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
         } else {
-          navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item } });
+          navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item, fromSearch: true } });
         }
       }}>
       <View
