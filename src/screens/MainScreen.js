@@ -13,6 +13,48 @@ import Animated from 'react-native-reanimated';
 
 const {width} = Dimensions.get('window');
 
+const CarouselCard = ({item}) => {
+  const navigation = useNavigation();
+  const startX = React.useRef(0);
+  const moved = React.useRef(false);
+
+  return (
+    <Pressable
+      onTouchStart={e => {
+        startX.current = e.nativeEvent.pageX;
+        moved.current = false;
+      }}
+      onTouchMove={e => {
+        const dx = Math.abs(e.nativeEvent.pageX - startX.current);
+        if (dx > 10) moved.current = true;
+      }}
+      onPress={() => {
+        if (moved.current) return;
+        item.type = 'movie';
+        navigation.navigate('MovieDetail', {movie: item});
+      }}
+      key={item.id}
+      style={{
+        flex: 1,
+        alignContent: 'center',
+        alignItems: 'center',
+        marginTop: 5,
+      }}>
+      <Animated.Image
+        source={{
+          uri: item.imageLarge,
+        }}
+        style={{
+          width: '90%',
+          height: 480,
+          borderRadius: 10,
+        }}
+        sharedTransitionTag="movie-image"
+      />
+    </Pressable>
+  );
+};
+
 export const MainScreen = () => {
   const [movies, setMovies] = React.useState([]);
   const [series, setSeries] = React.useState([]);
@@ -109,34 +151,7 @@ export const MainScreen = () => {
         modeConfig={{
           showLength: 3,
         }}
-        renderItem={({item}) => {
-          return (
-            <Pressable
-              onPress={() => {
-                item.type = 'movie';
-                navigation.navigate('MovieDetail', {movie: item});
-              }}
-              key={item.id}
-              style={{
-                flex: 1,
-                alignContent: 'center',
-                alignItems: 'center',
-                marginTop: 5,
-              }}>
-              <Animated.Image
-                source={{
-                  uri: item.imageLarge,
-                }}
-                style={{
-                  width: '90%',
-                  height: 480,
-                  borderRadius: 10,
-                }}
-                sharedTransitionTag="movie-image"
-              />
-            </Pressable>
-          );
-        }}
+        renderItem={({item}) => <CarouselCard item={item} />}
       />
       {continueWatching.length > 0 && <Headline>Continue Watching</Headline>}
       <FlatList

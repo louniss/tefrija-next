@@ -18,6 +18,7 @@ export const FetchVideoComponent = ({
   const [doneIframe, setDoneIframe] = useState(false);
   const [doneM3u8, setDoneM3u8] = useState(false);
   const [iframeUrls, setIframeUrls] = useState([]);
+  const [m3u8Found, setM3u8Found] = useState(false);
 
   let src;
 
@@ -86,7 +87,12 @@ export const FetchVideoComponent = ({
           switch (type) {
             case 'master.m3u8':
             case 'list.m3u8':
+              if (m3u8Found) {
+                return;
+              }
               console.log('master.m3u8', url);
+              setUrl('');
+              setM3u8Found(true);
               const response = await fetch(url, {
                 method: 'GET',
               });
