@@ -77,18 +77,21 @@ const MoviesShowsByGenre = () => {
     <View style={{ flex: 1 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', padding: 8 }}>
         <IconButton icon="arrow-left" onPress={() => navigation.goBack()} />
-        <View style={{ flex: 1 }}>
-          <Headline>{activeGenre?.name || genre?.name || 'Genre'}</Headline>
-          <View style={{ flexDirection: 'row', marginTop: 8 }}>
-            <Button mode={type === 'movie' ? 'contained' : 'text'} onPress={() => setType('movie')} disabled={!genre?.movieId}>
-              Movies
-            </Button>
-            <View style={{ width: 12 }} />
-            <Button mode={type === 'tv' ? 'contained' : 'text'} onPress={() => setType('tv')} disabled={!genre?.tvId}>
-              Series
-            </Button>
-          </View>
-        </View>
+        <Headline style={{ marginLeft: 8 }}>{activeGenre?.name || genre?.name || 'Genre'}</Headline>
+        <View style={{ flex: 1 }} />
+        <Button
+          mode={type === 'movie' ? 'contained' : 'text'}
+          onPress={() => setType('movie')}
+          disabled={!activeGenre?.movieId && !genre?.movieId}
+          style={{ marginRight: 8 }}>
+          Movies
+        </Button>
+        <Button
+          mode={type === 'tv' ? 'contained' : 'text'}
+          onPress={() => setType('tv')}
+          disabled={!activeGenre?.tvId && !genre?.tvId}>
+          Series
+        </Button>
       </View>
 
       {/* If no activeGenre, show selector UI */}
