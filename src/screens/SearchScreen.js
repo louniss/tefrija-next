@@ -6,7 +6,7 @@ import { Appbar, Badge, Text, IconButton, ActivityIndicator } from 'react-native
 import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
 import { FlatGrid } from 'react-native-super-grid';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
 const SearchScreen = () => {
@@ -195,10 +195,15 @@ const SearchScreen = () => {
     <SafeAreaView style={{ paddingBottom: 50 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
         <IconButton
-          icon="arrow-left"
+          icon="home"
           size={24}
           onPress={() => {
-            navigation.goBack();
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              }),
+            );
           }}
           style={{ margin: 0 }}
         />
