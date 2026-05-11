@@ -18,18 +18,41 @@ const SearchScreen = () => {
   const [suggestionLoading, setSuggestionLoading] = React.useState(false);
 
   const [page, setPage] = React.useState(1);
+  const [totalPages, setTotalPages] = React.useState(null);
+  const [totalResults, setTotalResults] = React.useState(null);
+  const flatRef = React.useRef(null);
+  const [scrollOffset, setScrollOffset] = React.useState(0);
+  const [lastQuery, setLastQuery] = React.useState('');
 
   const navigation = useNavigation();
 
   const search = async (reset, overridePage, overrideQuery) => {
     const p = overridePage ?? page;
     const q = overrideQuery ?? searchQuery;
+    console.log('[search] start', { reset, overridePage, overrideQuery, usingPage: p, usingQuery: q, statePage: page, stateQuery: searchQuery });
     setSearchLoading(true);
     try {
       const res = await moviedb.searchMulti({
         query: q,
         page: p,
       });
+
+      console.log('[search] tmdb response meta', {
+        total_results: res.total_results,
+        total_pages: res.total_pages,
+        raw_results_length: (res.results || []).length,
+      });
+      setTotalPages(res.total_pages || 1);
+      setTotalResults(res.total_results || 0);
+      if (res.results && res.results.length) {
+        const types = res.results.reduce((acc, it) => {
+          acc[it.media_type] = (acc[it.media_type] || 0) + 1;
+          return acc;
+        }, {});
+        console.log('[search] tmdb result media types sample', types, 'sampleIds', res.results.slice(0,5).map(r=>({id:r.id, type:r.media_type, title:r.title||r.name}))); 
+      } else {
+        console.log('[search] tmdb returned no raw results for this page');
+      }
 
       const r = res.results
         .map(item => {
@@ -53,12 +76,25 @@ const SearchScreen = () => {
         .filter(Boolean);
 
       if (reset) {
+        console.log('[search] reset results length', r.length);
         setSearchResults(r);
       } else {
+        console.log('[search] append results length', r.length);
         setSearchResults(prev => [...prev, ...r]);
+        // After appending, restore previous scroll offset to avoid jump-to-top
+        setTimeout(() => {
+          try {
+            if (flatRef.current && typeof flatRef.current.scrollToOffset === 'function') {
+              console.log('[search] restoring scroll offset', scrollOffset);
+              flatRef.current.scrollToOffset({ offset: scrollOffset, animated: false });
+            }
+          } catch (e) {
+            console.warn('[search] failed to restore scroll offset', e && (e.message || e));
+          }
+        }, 50);
       }
     } catch (e) {
-      // ignore
+      console.error('[search] error', e && (e.message || e), e && e.stack ? e.stack : e);
     } finally {
       setSearchLoading(false);
     }
@@ -197,11 +233,14 @@ const SearchScreen = () => {
               }
             }}
             onSubmitEditing={async () => {
+              const isNew = lastQuery !== searchQuery;
               setPage(1);
-              setSearchResults([]);
               setHasSearched(true);
+              setLastQuery(searchQuery);
+              // If query changed, reset results; otherwise append
+              const reset = isNew;
               // Run TMDB search and suggestion fetch in parallel
-              await Promise.all([search(true, 1, searchQuery), fetchSuggestion(searchQuery)]);
+              await Promise.all([search(reset, 1, searchQuery), fetchSuggestion(searchQuery)]);
             }}
             focusAfterOpened={true}
             onOpened={() => { }}
@@ -213,11 +252,13 @@ const SearchScreen = () => {
         <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
           <Pressable
             onPress={async () => {
+              const isNew = lastQuery !== suggestion;
               setSearchQuery(suggestion);
               setHasSearched(true);
               setPage(1);
-              setSearchResults([]);
-              await Promise.all([search(true, 1, suggestion), fetchSuggestion(suggestion)]);
+              setLastQuery(suggestion);
+              const reset = isNew;
+              await Promise.all([search(reset, 1, suggestion), fetchSuggestion(suggestion)]);
             }}
             style={{ padding: 8 }}>
             <Text style={{ color: '#666' }}>See also <Text style={{ color: '#1a73e8' }}>{suggestion}</Text>?</Text>
@@ -245,11 +286,13 @@ const SearchScreen = () => {
               </Text>
               <Pressable
                 onPress={async () => {
+                  const isNew = lastQuery !== suggestion;
                   setSearchQuery(suggestion);
                   setHasSearched(true);
                   setPage(1);
-                  setSearchResults([]);
-                  await search(true, 1, suggestion);
+                  setLastQuery(suggestion);
+                  const reset = isNew;
+                  await search(reset, 1, suggestion);
                 }}
                 style={{ padding: 8 }}>
                 <Text style={{ fontSize: 18, color: '#1a73e8' }}>{suggestion}</Text>
@@ -259,10 +302,12 @@ const SearchScreen = () => {
               </Text>
               <Pressable
                 onPress={async () => {
+                  const isNew = lastQuery !== searchQuery;
                   setHasSearched(true);
                   setPage(1);
-                  setSearchResults([]);
-                  await search(true, 1);
+                  setLastQuery(searchQuery);
+                  const reset = isNew;
+                  await search(reset, 1, searchQuery);
                 }}
                 style={{ padding: 8 }}>
                 <Text style={{ color: '#666' }}>Search</Text>
@@ -280,10 +325,21 @@ const SearchScreen = () => {
         <FlatGrid
           data={searchResults}
           onEndReached={() => {
-            if (searchLoading) return;
-            const next = page + 1;
-            setPage(next);
-            search(false, next);
+            console.log('[onEndReached] fired', { page, totalPages, searchLoading, searchQuery });
+            if (searchLoading) {
+              console.log('[onEndReached] aborting because searchLoading=true');
+              return;
+            }
+            if (totalPages != null && page >= totalPages) {
+              console.log('[onEndReached] no more pages (page>=totalPages)', { page, totalPages });
+              return;
+            }
+            setPage(prev => {
+              const next = prev + 1;
+              console.log('[onEndReached] setPage prev/next', { prev, next });
+              search(false, next, searchQuery);
+              return next;
+            });
           }}
           renderItem={({ item }) => {
             return <RenderCard item={item} />;
