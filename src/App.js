@@ -19,6 +19,7 @@ import PopularShowsScreen from './screens/PopularShowsScreen';
 import PopularMoviesScreen from './screens/PopularMoviesScreen';
 import TopRatedMoviesScreen from './screens/TopRatedMoviesScreen';
 import TopRatedShowsScreen from './screens/TopRatedShowsScreen';
+import MoviesShowsByGenre from './screens/MoviesShowsByGenre';
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -35,6 +36,7 @@ const InitialHome = () => {
       <Stack.Screen name="PopularMovies" component={PopularMoviesScreen} />
       <Stack.Screen name="TopRatedMovies" component={TopRatedMoviesScreen} />
       <Stack.Screen name="TopRatedShows" component={TopRatedShowsScreen} />
+        <Stack.Screen name="MoviesShowsByGenre" component={MoviesShowsByGenre} />
       <Stack.Screen
         name="VideoPlayerEmbed"
         component={VideoPlayer}

@@ -137,6 +137,39 @@ export const MainScreen = () => {
     });
   }, []);
 
+  const [genres, setGenres] = React.useState([]);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchGenres = async () => {
+      try {
+        const gm = await moviedb.genreMovieList();
+        const gt = await moviedb.genreTvList();
+
+        // Combine by name to avoid duplicates and keep both ids when available
+        const map = {};
+        (gm.genres || []).forEach(g => {
+          map[(g.name || '').toLowerCase()] = { name: g.name, movieId: g.id };
+        });
+        (gt.genres || []).forEach(g => {
+          const key = (g.name || '').toLowerCase();
+          if (!map[key]) map[key] = { name: g.name, tvId: g.id };
+          else map[key].tvId = g.id;
+        });
+
+        const list = Object.keys(map).map(k => map[k]);
+        if (mounted) setGenres(list);
+      } catch (e) {
+        console.warn('failed to fetch genres', e && e.message);
+      }
+    };
+
+    fetchGenres();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   return (
     <ScrollView>
       <Carousel
@@ -159,6 +192,38 @@ export const MainScreen = () => {
         data={continueWatching}
         renderItem={({item}) => <RenderCard item={item} />}
       />
+
+      {/* Genres section */}
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingTop: 12,
+        }}>
+        <Headline>Genres</Headline>
+        <Button onPress={() => navigation.navigate('MoviesShowsByGenre')}>more</Button>
+      </View>
+
+      <ScrollView horizontal style={{ paddingVertical: 8 }} contentContainerStyle={{ paddingHorizontal: 8 }}>
+        {genres.map(g => (
+          <Pressable
+            key={g.name}
+            onPress={() => {
+              navigation.navigate('MoviesShowsByGenre', { genre: g });
+            }}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 20,
+              backgroundColor: '#eee',
+              marginRight: 8,
+            }}>
+            <Text>{g.name}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+
       <View
         style={{
           flexDirection: 'row',
