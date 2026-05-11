@@ -247,8 +247,8 @@ const SearchScreen = () => {
           />
         </View>
       </View>
-      {/* Suggestion hint shown after a search, above results */}
-      {hasSearched && suggestion ? (
+      {/* Suggestion hint shown after a search, above results (hide if suggestion equals query) */}
+      {hasSearched && suggestion && suggestion.trim().toLowerCase() !== (searchQuery || '').trim().toLowerCase() ? (
         <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
           <Pressable
             onPress={async () => {
