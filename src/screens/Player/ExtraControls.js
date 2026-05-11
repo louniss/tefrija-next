@@ -491,16 +491,22 @@ const ExtraControls = ({
             <View style={{flexDirection: 'row', padding: 10}}>
               <View style={{flex: 1, paddingRight: 8}}>
                 <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-                  <Headline style={{flex: 1}}>Subtitles</Headline>
-                  <Chip style={{}} mode="outlined" disabled={true}>
-                    {currentLang} {subtitleNumber + 1}
-                  </Chip>
+                  <Headline style={{marginRight: 12}}>Subtitles</Headline>
+                  <Button
+                    mode="text"
+                    compact={true}
+                    onPress={() => setSubtitleIsVisible(!subtitleIsVisible)}
+                    icon={subtitleIsVisible ? 'eye-off' : 'eye'}
+                    style={{marginRight: 12}}
+                  >
+                    {subtitleIsVisible ? 'Hide Subtitle' : 'Show Subtitle'}
+                  </Button>
+                  <View style={{flex: 1, alignItems: 'flex-end'}}>
+                    <Chip mode="outlined" disabled={true}>
+                      {currentLang} {subtitleNumber + 1}
+                    </Chip>
+                  </View>
                 </View>
-                <Button
-                  icon={subtitleIsVisible ? 'eye-off' : 'eye'}
-                  onPress={() => setSubtitleIsVisible(!subtitleIsVisible)}>
-                  {subtitleIsVisible ? 'Hide Subtitle' : 'Show Subtitle'}
-                </Button>
                 <Divider style={{marginVertical: 8}} />
                 <ScrollView style={{height: 200}}>
                   {langs.map(lang => (
