@@ -198,6 +198,10 @@ const SearchScreen = () => {
         }
       }
 
+      // sanitize suggestion: remove common trailing qualifiers like "(film series)"
+      if (text && typeof text === 'string') {
+        text = text.replace(/\(film series\)/i, '').trim();
+      }
       if (!cancelled) setSuggestion(text);
       return text;
     } finally {
@@ -212,10 +216,10 @@ const SearchScreen = () => {
     <SafeAreaView style={{ paddingBottom: 50 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
         <IconButton
-          icon="menu"
+          icon="arrow-left"
           size={24}
           onPress={() => {
-            navigation.openDrawer();
+            navigation.goBack();
           }}
           style={{ margin: 0 }}
         />

@@ -7,6 +7,7 @@ import {
   TouchableWithoutFeedback,
   Dimensions,
   Pressable,
+  ScrollView,
 } from 'react-native';
 import {
   ActivityIndicator,
@@ -29,7 +30,6 @@ import WebView from 'react-native-webview';
 import {moviedb} from '../../movieDb';
 import {useNavigation} from '@react-navigation/native';
 import SubtitleManager from '../../SubtitleManager';
-import {ScrollView} from 'react-native-gesture-handler';
 
 import useMainState from '../../state/Main';
 import delay from 'delay';
@@ -473,9 +473,6 @@ const ExtraControls = ({
           theme={{
             dark: colorScheme === 'dark',
           }}
-          style={{
-            flex: 1,
-          }}
           visible={subtitleModalVisible}
           dismissableBackButton={true}
           onDismiss={() => {
@@ -490,64 +487,53 @@ const ExtraControls = ({
               top: -10,
             }}
           />
-          <View style={{padding: 10}}>
+          <Dialog.Content>
             <View style={{flexDirection: 'row', padding: 10}}>
-              <Headline>Subtitles</Headline>
-
-              <Chip style={{marginLeft: 10}} mode="outlined" disabled={true}>
-                {currentLang} {subtitleNumber + 1}
-              </Chip>
-
-              <Button
-                icon={subtitleIsVisible ? 'eye-off' : 'eye'}
-                onPress={() => {
-                  setSubtitleIsVisible(!subtitleIsVisible);
-                }}>
-                {subtitleIsVisible ? 'Hide Subtitle' : 'Show Subtitle'}
-              </Button>
+              <View style={{flex: 1, paddingRight: 8}}>
+                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
+                  <Headline style={{flex: 1}}>Subtitles</Headline>
+                  <Chip style={{}} mode="outlined" disabled={true}>
+                    {currentLang} {subtitleNumber + 1}
+                  </Chip>
+                </View>
+                <Button
+                  icon={subtitleIsVisible ? 'eye-off' : 'eye'}
+                  onPress={() => setSubtitleIsVisible(!subtitleIsVisible)}>
+                  {subtitleIsVisible ? 'Hide Subtitle' : 'Show Subtitle'}
+                </Button>
+                <Divider style={{marginVertical: 8}} />
+                <ScrollView style={{height: 200}}>
+                  {langs.map(lang => (
+                    <List.Item
+                      key={lang.code}
+                      onPress={() => {
+                        setSelectedLang(lang.code);
+                        setCurrentLang(lang.lang);
+                      }}
+                      title={lang.lang}
+                    />
+                  ))}
+                  <Divider />
+                  {subtitleManager.langs.map((lang, idx) => (
+                    <List.Item key={lang.title || idx} onPress={() => {}} title={lang.title} />
+                  ))}
+                </ScrollView>
+              </View>
+              <View style={{flex: 1}}>
+                <ScrollView style={{height: 200}}>
+                  {new Array(15).fill(0).map((n, index) => (
+                    <List.Item
+                      key={index}
+                      onPress={() => {
+                        setSubtitleNumber(index);
+                      }}
+                      title={`${currentLang} ${index + 1}`}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
             </View>
-            <Divider />
-            <ScrollView style={{width: '50%', height: 200}}>
-              {langs.map(lang => (
-                <>
-                  <List.Item
-                    onPress={() => {
-                      setSelectedLang(lang.code);
-                      setCurrentLang(lang.lang);
-                    }}
-                    title={lang.lang}
-                  />
-                </>
-              ))}
-              <Divider />
-
-              {subtitleManager.langs.map(lang => (
-                <>
-                  <List.Item onPress={() => {}} title={lang.title} />
-                </>
-              ))}
-            </ScrollView>
-          </View>
-
-          <ScrollView
-            style={{
-              width: '50%',
-              height: 200,
-              position: 'absolute',
-              right: 0,
-              top: 80,
-            }}>
-            {new Array(15).fill(0).map((n, index) => (
-              <>
-                <List.Item
-                  onPress={() => {
-                    setSubtitleNumber(index);
-                  }}
-                  title={`${currentLang} ${index + 1}`}
-                />
-              </>
-            ))}
-          </ScrollView>
+          </Dialog.Content>
         </Dialog>
       </Portal>
     </View>
