@@ -180,6 +180,7 @@ const SearchScreen = () => {
       // sanitize suggestion: remove common trailing qualifiers like "(film series)"
       if (text && typeof text === 'string') {
         text = text.replace(/\(film series\)/i, '').trim();
+        text = text.replace(/\(franchise\)/i, '').trim();
       }
       if (!cancelled) setSuggestion(text);
       return text;
