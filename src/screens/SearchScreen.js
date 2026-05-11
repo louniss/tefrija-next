@@ -1,5 +1,6 @@
 import { Image, Pressable, ScrollView, View } from 'react-native';
 import React, { Component } from 'react';
+import { jsdom } from 'jsdom-jscore-rn';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Appbar, Badge, Text, IconButton, ActivityIndicator } from 'react-native-paper';
 import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
@@ -121,31 +122,9 @@ const SearchScreen = () => {
       let dom;
       let doc = null;
       try {
-        const jsdomModule = require('jsdom-jscore-rn');
-        console.log('[suggestion] jsdom-jscore-rn module keys', jsdomModule && Object.keys(jsdomModule));
-
-        const jsdomHelper = jsdomModule && (jsdomModule.jsdom || jsdomModule.jsdomjs || jsdomModule.jsdomHelper || jsdomModule.default || jsdomModule);
-
-        if (!jsdomHelper || typeof jsdomHelper !== 'function') {
-          console.warn('[suggestion] jsdom-jscore-rn does not expose a callable `jsdom`; attempting any callable export');
-          const keys = jsdomModule ? Object.keys(jsdomModule) : [];
-          for (let k of keys) {
-            if (typeof jsdomModule[k] === 'function') {
-              try {
-                console.log('[suggestion] trying callable export', k);
-                dom = jsdomModule[k](html);
-                break;
-              } catch (err) {
-                console.warn('[suggestion] callable export failed', k, err);
-              }
-            }
-          }
-        } else {
-          dom = jsdomHelper(html);
-        }
-
+        dom = jsdom(html);
         if (!dom) {
-          console.error('[suggestion] jsdom-jscore-rn: failed to create dom with available exports');
+          console.error('[suggestion] jsdom-jscore-rn: jsdom returned falsy dom');
           return null;
         }
 
@@ -162,7 +141,7 @@ const SearchScreen = () => {
           return null;
         }
       } catch (parseErr) {
-        console.error('[suggestion] JSDOM (jsdom-jscore-rn) parse/require error', parseErr && (parseErr.message || parseErr), parseErr && parseErr.stack ? parseErr.stack : parseErr);
+        console.error('[suggestion] JSDOM parse error', parseErr && (parseErr.message || parseErr));
         return null;
       }
       // Try a few selectors matching Yahoo's suggestion area (h4 first)
