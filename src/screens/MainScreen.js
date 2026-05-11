@@ -202,7 +202,6 @@ export const MainScreen = () => {
           paddingTop: 12,
         }}>
         <Headline>Genres</Headline>
-        <Button onPress={() => navigation.navigate('MoviesShowsByGenre')}>more</Button>
       </View>
 
       <ScrollView horizontal style={{ paddingVertical: 8 }} contentContainerStyle={{ paddingHorizontal: 8 }}>

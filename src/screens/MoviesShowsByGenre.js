@@ -141,7 +141,7 @@ const MoviesShowsByGenre = () => {
             <Pressable onPress={() => navigation.navigate(type === 'movie' ? 'MovieDetail' : 'SerieDetail', { [type === 'movie' ? 'movie' : 'serie']: item })}>
               <View style={{ borderWidth: 1, borderRadius: 5, borderColor: 'rgba(153,153,153,0.2)' }}>
                 {item.image ? (
-                  <Image source={{ uri: item.image }} style={{ width: '100%', height: 160 }} />
+                  <Image source={{ uri: item.image }} style={{ width: '100%', height: 250 }} />
                 ) : null}
                 <Text style={{ padding: 6, height: 48 }}>{item.title} ({item.year})</Text>
               </View>
