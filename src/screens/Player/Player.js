@@ -87,23 +87,18 @@ const Player = ({
         style={styles.videoPlayer}
         source={{
           uri: uri,
-          //uri: 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8',
           headers: {
-            authority: 'tmstr1.neonhorizonworkshops.com',
-            accept: '*/*',
-            'accept-language': 'en-US,en;q=0.9',
-            priority: 'u=1, i',
-            origin: 'https://cloudnestra.com',
-            referer: 'https://cloudnestra.com/',
-            'sec-ch-ua':
-              '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"',
+            ':authority': 'horologyhollow.site',
+            origin: 'https://cloudorchestranova.com',
+            referer: 'https://cloudorchestranova.com/',
+            'sec-ch-ua': '"Chromium";v="148", "Google Chrome";v="148", "Not/A)Brand";v="99"',
             'sec-ch-ua-mobile': '?0',
-            'sec-ch-ua-platform': '"Linux"',
+            'sec-ch-ua-platform': '"macOS"',
             'sec-fetch-dest': 'empty',
             'sec-fetch-mode': 'cors',
             'sec-fetch-site': 'cross-site',
             'user-agent':
-              'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+              'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36',
           },
         }}
       />

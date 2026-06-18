@@ -23,9 +23,9 @@ export const FetchVideoComponent = ({
   let src;
 
   if (type === 'movie') {
-    src = `https://vsembed.su/embed/movie/${id}`;
+    src = `https://vsembed.ru/embed/movie/${id}`;
   } else {
-    src = `https://vsembed.su/embed/tv/${id}/${season}/${episode}`;
+    src = `https://vsembed.ru/embed/tv/${id}/${season}/${episode}`;
   }
 
   const [url, setUrl] = useState(src);
@@ -74,8 +74,10 @@ export const FetchVideoComponent = ({
         source={{
           uri: url,
           headers: {
-            origin: 'https://cloudnestra.com',
-            referer: 'https://cloudnestra.com/',
+            origin: 'ideationalidiom.website',
+            referer: `${src}/`,
+            authority: 'cloudorchestranova.com',
+            
           },
         }}
         injectedJavaScriptBeforeContentLoaded={injectScript}
