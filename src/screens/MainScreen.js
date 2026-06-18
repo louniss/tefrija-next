@@ -10,6 +10,8 @@ import {Badge, Button, Headline, IconButton, Text} from 'react-native-paper';
 import Carousel from 'react-native-reanimated-carousel';
 import {Dimensions} from 'react-native';
 import Animated from 'react-native-reanimated';
+// react native built in color scheme hook
+import {useColorScheme} from 'react-native';
 
 const {width} = Dimensions.get('window');
 
@@ -46,7 +48,7 @@ const CarouselCard = ({item}) => {
         }}
         style={{
           width: '90%',
-          height: 480,
+          height: 400,
           borderRadius: 10,
         }}
         sharedTransitionTag="movie-image"
@@ -62,6 +64,11 @@ export const MainScreen = () => {
   const [topRatedSeries, setTopRatedSeries] = React.useState([]);
 
   const [continueWatching, setContinueWatching] = React.useState([]);
+
+  const colorScheme = useColorScheme();
+
+  const isDarkMode = colorScheme === 'dark';
+  
 
   const state = useMainState();
   const navigation = useNavigation();
@@ -175,7 +182,7 @@ export const MainScreen = () => {
       <Carousel
         data={movies}
         width={width}
-        height={500}
+        height={450}
         autoPlay={false}
         panGestureHandlerProps={{
           activeOffsetX: [-10, 20],
@@ -215,10 +222,10 @@ export const MainScreen = () => {
               paddingHorizontal: 12,
               paddingVertical: 8,
               borderRadius: 20,
-              backgroundColor: '#eee',
+              backgroundColor: isDarkMode ? '#333' : '#eee',
               marginRight: 8,
             }}>
-            <Text>{g.name}</Text>
+            <Text style={{ color: isDarkMode ? '#fff' : '#000' }}>{g.name}</Text>
           </Pressable>
         ))}
       </ScrollView>
