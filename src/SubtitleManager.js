@@ -9,17 +9,12 @@
  */
 
 import axios from 'axios';
-import {zip, unzip, unzipAssets} from 'react-native-zip-archive';
+import {unzip} from 'react-native-zip-archive';
 
-import {jsdom} from 'jsdom-jscore-rn';
-
+const ass2srt = require('ass-to-srt');
 const iconv = require('iconv-lite');
 const RNFS = require('react-native-fs');
 const path = RNFS.DocumentDirectoryPath;
-
-const ass2srt = require('ass-to-srt');
-const COOKIE =
-  '_ga=GA1.1.738056706.1742357633; searchform=formname%3Dsearchform%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C1%7C%7C%7C1%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C%7C; download-counter=4; pref_mk=%7B%22tv%22%3A1%2C%22m%22%3A4%7D; remember_sid=-5aNuKxqZ3RsAKx3KGuNcu08EK6; weblang=en; user=fohipeort; _ga_1D0CX3QS3M=GS1.1.1746053485.3.1.1746053948.60.0.0; PHPSESSID=-5aNuKxqZ3RsAKx3KGuNcu08EK6; techaro.lol-anubis-cookie-verification=019d3e70-54a6-7565-be56-2a40e3fda0f8; cf_clearance=sjBYbuzwWhOb_fKVhlCUZ0hREY3Q8IxvKXvME1YTnl8-1774869042-1.2.1.1-lVri2QkvyLAKObDKoS_3Koy2p2nMcB0nY6MiQXB_KSXgKFPgNWD_M1ooOnSJnJMUrY0Cm.SRM3.Ni9zfWgwEe11AwkI5tZOX911gGSk37oktEYvZfh_.Te7hgz1h17fVqwiMLMwVu94j3w8_Yd9x6cAY2TDgi5YeAJga4Ala6B2IssFx2.KtmpeQVvPdKZ5EPeQflPNyBjQo2x_JZUr_n83neyRB_BDiXPcHSnyV6Xs; techaro.lol-anubis-auth=eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhY3Rpb24iOiJDSEFMTEVOR0UiLCJjaGFsbGVuZ2UiOiIwMTlkM2U3MC01NGE2LTc1NjUtYmU1Ni0yYTQwZTNmZGEwZjgiLCJleHAiOjE3NzU0NzM4NDMsImlhdCI6MTc3NDg2OTA0MywibWV0aG9kIjoiZmFzdCIsIm5iZiI6MTc3NDg2ODk4MywicG9saWN5UnVsZSI6Ijg0ZmQ4ZDdmMmM0MjAwNDgiLCJyZXN0cmljdGlvbiI6IjQwOWIyNmU0YWI2ZDcxYTliYTcwZWFmNzhiYjgwYjYxNmY3OGJkNTA3NTRmZWIwY2I5N2NlM2E5NzNmM2ZlYzcifQ._OKba8DAyv2C2Xbo67u0duwDi7-8YT8oXtl-GlLCuKK4Ca1ZHMrvpXzQPCzen-Zlvy5nWAFRNpQcfp4A2YgWDg; logged=1';
 
 const LANGS = [
   {title: 'Abkhazian', value: 'abk'},
@@ -137,106 +132,96 @@ class SubtitleManager {
   }
 
   async fetchSubtitleLinks(imdbId, lang) {
-    const langId = lang;
-    const url = `https://opensubtitles.org/en/search/sublanguageid-${langId}/imdbid-${imdbId}`;
+    const url = `https://rest.opensubtitles.org/search/imdbid-${imdbId}/sublanguageid-${lang}`;
     try {
-      const params = {
-        method: 'GET',
+      const response = await axios.get(url, {
         headers: {
           'User-Agent':
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-          'Accept-Language': 'en-US,en;q=0.9',
-          Cookie: COOKIE,
+          Accept: 'application/json',
         },
-        redirect: 'follow',
-      };
-      let response = await fetch(url, params);
+      });
 
-      const text = await response.text();
-      const dom = jsdom(text);
-
-      if (url !== response.url) {
-        const downloadLink = dom.querySelector('#bt-dwl-bt');
-        if (downloadLink) {
-          const id = downloadLink.getAttribute('data-product-id');
-          return [`https://dl.opensubtitles.org/${lang}/download/sub/${id}`];
-        }
-      }
-
-      const links = dom.querySelectorAll('td strong a.bnone');
-      const subtitleIds = [];
-
-      for (let i = 0; i < links.length; i++) {
-        const href = links[i].getAttribute('href');
-        const id = href.split('/')[3];
-        subtitleIds.push(id);
-      }
-
-      const subtitleLinks = subtitleIds.map(
-        id => `https://dl.opensubtitles.org/${lang}/download/sub/${id}`,
-      );
-      return subtitleLinks;
+      return response.data.map(item => ({
+        downloadUrl: item.ZipDownloadLink,
+        subDownloadUrl: item.SubDownloadLink,
+        format: item.SubFormat,
+        encoding: item.SubEncoding,
+        id: item.IDSubtitle,
+        fileName: item.SubFileName,
+        downloads: item.SubDownloadsCnt,
+      }));
     } catch (error) {
       console.error('fetchSubtitleLinks error: ', error);
       return [];
     }
   }
 
-  async saveZippedSubtitle(url) {
-    const subtitleId = url.split('/')[6];
-    console.log('sub id', subtitleId);
+  async saveZippedSubtitle(url, subtitleId) {
     try {
+      const filePath = `${path}/${subtitleId}.zip`;
       await RNFS.downloadFile({
-        headers: {
-          Cookie: COOKIE,
-        },
         fromUrl: url,
-        toFile: `${path}/${subtitleId}.zip`,
+        toFile: filePath,
       }).promise;
-      return `${path}/${subtitleId}.zip`;
+      return filePath;
     } catch (error) {
       console.error(error);
       return null;
     }
   }
 
-  async subtitleUrlToText(subtitleUrl) {
+  async subtitleUrlToText(subtitleInfo) {
     try {
-      const subtitleFileZipped = await this.saveZippedSubtitle(subtitleUrl);
-      const subtitleId = subtitleUrl.split('/')[6];
-      const dir = path;
-      await RNFS.readDir(dir).then(files => {
-        console.log('files in dir: ', files);
-      });
-      const unzipped = await unzip(subtitleFileZipped, `${path}/${subtitleId}`);
+      const {downloadUrl, format, encoding, id} = subtitleInfo;
 
-      const files = await RNFS.readDir(unzipped);
+      const subtitleFileZipped = await this.saveZippedSubtitle(downloadUrl, id);
+      if (!subtitleFileZipped) return null;
 
-      let strFile = files.find(file => file.name.endsWith('.srt'));
+      const unzippedDir = await unzip(subtitleFileZipped, `${path}/${id}`);
+      const files = await RNFS.readDir(unzippedDir);
+
+      let srtFile = files.find(file => file.name.endsWith('.srt'));
       const assFile = files.find(file => file.name.endsWith('.ass'));
+
+      let targetFile;
+      if (assFile && !srtFile) {
+        targetFile = assFile;
+      } else {
+        targetFile = srtFile || files[0];
+      }
+
+      if (!targetFile) return null;
 
       let utf8Data, arabicData;
 
-      if (assFile) {
-        strFile = assFile.path;
-      } else {
-        strFile = strFile.path;
-      }
-
       try {
-        utf8Data = await RNFS.readFile(strFile, 'utf8');
-        if (assFile) {
+        utf8Data = await RNFS.readFile(targetFile.path, 'utf8');
+        if (
+          format === 'ass' ||
+          format === 'ssa' ||
+          targetFile.name.endsWith('.ass') ||
+          targetFile.name.endsWith('.ssa')
+        ) {
           utf8Data = ass2srt(utf8Data);
         }
-      } catch (error) {}
+      } catch (e) {}
 
       try {
-        arabicData = await RNFS.readFile(strFile, 'ascii');
-        if (assFile) {
+        arabicData = await RNFS.readFile(targetFile.path, 'ascii');
+        if (
+          format === 'ass' ||
+          format === 'ssa' ||
+          targetFile.name.endsWith('.ass') ||
+          targetFile.name.endsWith('.ssa')
+        ) {
           arabicData = ass2srt(arabicData);
         }
-        arabicData = iconv.decode(arabicData, 'windows-1256');
-      } catch (error) {}
+        arabicData = iconv.decode(
+          arabicData,
+          encoding === 'CP1256' ? 'windows-1256' : 'windows-1256',
+        );
+      } catch (e) {}
 
       return {arabicData, utf8Data};
     } catch (error) {
@@ -245,5 +230,7 @@ class SubtitleManager {
     }
   }
 }
+
+
 
 export default SubtitleManager;
