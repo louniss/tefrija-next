@@ -100,6 +100,12 @@ const SearchScreen = () => {
       setSearchLoading(false);
     }
   };
+  // Open search box when screen mounts
+  React.useEffect(() => {
+    if (refSearchBox.current && typeof refSearchBox.current.open === 'function') {
+      refSearchBox.current.open();
+    }
+  }, []);
   // Clear suggestion when user is typing or hasn't searched
   React.useEffect(() => {
     if (!hasSearched || !searchQuery || searchQuery.trim().length === 0) {
@@ -208,9 +214,10 @@ const SearchScreen = () => {
           }}
           style={{ margin: 0 }}
         />
-        <View style={{ flex: 1 }}>
+        <View style={{ flex: 1, paddingTop: 8, paddingBottom: 8 }}>
           <ReactNativeAnimatedSearchbox
             ref={refSearchBox}
+            focusAfterOpened={true}
             placeholder={"Search..."}
             value={searchQuery}
             onChangeText={text => {
@@ -231,7 +238,6 @@ const SearchScreen = () => {
               // Run TMDB search and suggestion fetch in parallel
               await Promise.all([search(reset, 1, searchQuery), fetchSuggestion(searchQuery)]);
             }}
-            focusAfterOpened={true}
             onOpened={() => { }}
           />
         </View>
