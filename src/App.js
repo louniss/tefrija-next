@@ -6,7 +6,7 @@ import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {IconButton, Text} from 'react-native-paper';
 import {DefaultTheme, DarkTheme, useNavigation} from '@react-navigation/native';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
-import {useColorScheme} from 'react-native';
+import {useColorScheme, View} from 'react-native';
 
 import {MainScreen} from './screens/MainScreen';
 import SearchScreen from './screens/SearchScreen';
@@ -48,6 +48,22 @@ const InitialHome = () => {
   );
 };
 
+const HomeHeaderRight = () => {
+  const navigation = useNavigation();
+  return (
+    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+      <CastButton style={{ width: 24, height: 24, marginRight: 10 }} />
+      <IconButton
+        icon="magnify"
+        size={20}
+        onPress={() => {
+          navigation.navigate('Search');
+        }}
+      />
+    </View>
+  );
+};
+
 const Main = () => {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
@@ -86,13 +102,15 @@ const Main = () => {
             headerRight: () => {
               const navigation = useNavigation();
               return (
-                <IconButton
-                  icon="magnify"
-                  size={20}
-                  onPress={() => {
-                    navigation.navigate('Search');
-                  }}
-                />
+                <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                  <IconButton
+                    icon="magnify"
+                    size={20}
+                    onPress={() => {
+                      navigation.navigate('Search');
+                    }}
+                  />
+                </View>
               );
             },
           }}

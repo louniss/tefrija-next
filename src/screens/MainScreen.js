@@ -48,7 +48,7 @@ const CarouselCard = ({item}) => {
         }}
         style={{
           width: '90%',
-          height: 400,
+          height: 500,
           borderRadius: 10,
         }}
         sharedTransitionTag="movie-image"
@@ -182,7 +182,7 @@ export const MainScreen = () => {
       <Carousel
         data={movies}
         width={width}
-        height={450}
+        height={550}
         autoPlay={false}
         panGestureHandlerProps={{
           activeOffsetX: [-10, 20],
