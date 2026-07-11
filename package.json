@@ -24,6 +24,7 @@
     "delay": "^7.0.0",
     "graphql-ws": "^6.0.8",
     "jsdom-jscore-rn": "^0.1.9",
+    "minisearch": "^7.2.0",
     "moviedb-promise": "^4.0.8",
     "react": "19.2.3",
     "react-native": "0.85.3",
