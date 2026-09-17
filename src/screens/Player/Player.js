@@ -85,9 +85,7 @@ const Player = ({
           setSubtitleText(text);
         }}
         style={styles.videoPlayer}
-        source={{
-          uri: uri,
-        }}
+        source={uri ? {uri: uri} : undefined}
       />
       <ExtraControls
         isPlaying={isPlaying}

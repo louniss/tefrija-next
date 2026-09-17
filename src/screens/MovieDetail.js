@@ -100,7 +100,7 @@ const MovieDetail = ({navigation, route}) => {
         <Button
           style={{margin: 5, borderRadius: 5}}
           mode="contained-tonal"
-          disabled={loading}
+          disabled={true}
           loading={loading}
           icon="download">
           Download
