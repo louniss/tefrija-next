@@ -165,6 +165,7 @@ const VideoPlayerScreen = ({route}) => {
         }}
         onError={err => {
           console.log('err', err);
+          setPlayerError(err || true);
         }}
       />
     </View>

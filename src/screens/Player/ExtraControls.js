@@ -249,7 +249,9 @@ const ExtraControls = ({
             {playerError && (
               <View style={styles.errorContainer}>
                 <Headline style={styles.errorText}>
-                  error, change quality
+                  {typeof playerError === 'string'
+                    ? playerError
+                    : 'error, change quality'}
                 </Headline>
               </View>
             )}
