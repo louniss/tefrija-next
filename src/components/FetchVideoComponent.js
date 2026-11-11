@@ -163,6 +163,16 @@ export const FetchVideoComponent = ({
       case 'm3u8': {
         // The flow mints the playlist token itself (it needs the page's
         // api_token, which only exists inside the WebView), so pass it through.
+        const tokened =
+          data.tokened === true || /[?&]token=/.test(data.url || '');
+        if (!tokened) {
+          // A tokenless master.m3u8 is rejected by the CDN. Older cached flows
+          // reported this as success, which stalled them forever: treat it as a
+          // resolution failure so the flow gets refreshed and retried.
+          console.log('m3u8 without playlist token, discarding', data.url);
+          recover('resolved url has no playlist token');
+          break;
+        }
         doneRef.current = true;
         console.log('m3u8 found', data.url);
         onDoneRef.current(data.url);

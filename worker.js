@@ -125,7 +125,7 @@ const FLOW_SCRIPT = `
     sent = true;
     clearTimeout(watchdog);
     setRetryCount(0);
-    post('m3u8', {url: url});
+    post('m3u8', {url: url, tokened: true});
   }
 
   function fail(message) {
@@ -234,8 +234,14 @@ const FLOW_SCRIPT = `
 
     function attempt(i) {
       if (i >= candidates.length) {
+        /* A tokenless master.m3u8 always fails at the CDN, and handing it to the
+         * player would look like success here — the app would then never ask for
+         * a newer flow and the old, broken flow would stay cached. Failing is
+         * what makes the refresh/retry path work. */
         post('diag', {stage: 'stream-token', status: tokenStatus, token: 'none'});
-        return url;
+        throw new Error(
+          'stream token unavailable (generate.php ' + tokenStatus + ')',
+        );
       }
       return requestToken(candidates[i]).then(function (token) {
         if (token && token.split('.').length === 3) {

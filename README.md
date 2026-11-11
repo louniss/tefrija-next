@@ -147,3 +147,9 @@ Notable provider requirements the flow encodes (they change):
   `?api_token=`, otherwise it answers `403 invalid or mismatched api token`;
 - stream hosts rotate per request (`nectarandnectary.space`,
   `indigoinksociety.space`, …), so never hardcode them.
+
+The flow deliberately **fails** when it cannot mint a playlist token instead of
+returning a bare `master.m3u8`. A tokenless URL only surfaces later as a player
+error, and a flow that "succeeds" that way would never be refreshed — the app
+treats an untokened resolution as a failure too, so a stale cached flow heals
+itself on the next attempt.
