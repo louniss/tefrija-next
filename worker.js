@@ -110,6 +110,9 @@ const FLOW_SCRIPT = `
 
   var stage = 'landing';
   var sent = false;
+  /* Set from the player page CONFIG; forwarded to /generate.php. */
+  var apiToken = '';
+  var tokenStatus = null;
 
   /* Nothing may hang forever: an unresolved promise would leave the player on a
    * black screen with no explanation. */
@@ -191,8 +194,29 @@ const FLOW_SCRIPT = `
     return t;
   }
 
-  /* The stream CDN rejects a tokenless playlist with 401; <origin>/generate.php
-   * mints a short-lived, IP-bound token that has to be appended. */
+  /* The stream CDN rejects a tokenless playlist (the response carries no CORS
+   * headers, so the player just sees a network error). <origin>/generate.php
+   * mints a short-lived, IP-range-bound token that has to be appended.
+   *
+   * Since the provider re-bound this endpoint to the stream_urls API token, the
+   * player now forwards CONFIG.apiToken as ?api_token=... — without it the
+   * endpoint answers 403 "invalid or mismatched api token". The endpoint only
+   * re-checks the signature + IP range (it is not single-use), so the token we
+   * already used for stream_urls still works here. The bare call is kept as a
+   * fallback in case the requirement is dropped again. */
+  function requestToken(url) {
+    return fetch(url, {credentials: 'omit', cache: 'no-store'})
+      .then(function (r) {
+        tokenStatus = r.status;
+        return r.ok ? r.text() : '';
+      })
+      .then(parseToken)
+      .catch(function () {
+        tokenStatus = 'network-error';
+        return '';
+      });
+  }
+
   function withToken(url) {
     var origin;
     try {
@@ -201,16 +225,21 @@ const FLOW_SCRIPT = `
       return Promise.resolve(url);
     }
     progress('stream-token');
-    return fetch(origin + '/generate.php', {
-      credentials: 'omit',
-      cache: 'no-store',
-    })
-      .then(function (r) {
-        return r.ok ? r.text() : '';
-      })
-      .then(function (text) {
-        var token = parseToken(text);
+    var base = origin + '/generate.php';
+    var candidates = [];
+    if (apiToken) {
+      candidates.push(base + '?api_token=' + encodeURIComponent(apiToken));
+    }
+    candidates.push(base);
+
+    function attempt(i) {
+      if (i >= candidates.length) {
+        post('diag', {stage: 'stream-token', status: tokenStatus, token: 'none'});
+        return url;
+      }
+      return requestToken(candidates[i]).then(function (token) {
         if (token && token.split('.').length === 3) {
+          post('diag', {stage: 'stream-token', status: tokenStatus, token: 'ok'});
           return (
             url +
             (url.indexOf('?') > -1 ? '&' : '?') +
@@ -218,11 +247,10 @@ const FLOW_SCRIPT = `
             encodeURIComponent(token)
           );
         }
-        return url;
-      })
-      .catch(function () {
-        return url;
+        return attempt(i + 1);
       });
+    }
+    return Promise.resolve(attempt(0));
   }
 
   /* vsdec.js ships with the landing page and transparently decrypts encrypted
@@ -345,6 +373,8 @@ const FLOW_SCRIPT = `
 
   playerConfig()
     .then(function (cfg) {
+      apiToken = cfg.apiToken || '';
+      post('diag', {stage: 'config', apiToken: apiToken ? 'ok' : 'missing'});
       progress('stream-api');
       return fetchJSON(streamApi(cfg));
     })
@@ -391,7 +421,6 @@ function contentVersion(text) {
 }
 
 const FLOW_VERSION = contentVersion(FLOW_SCRIPT);
-const FLOW_UPDATED_AT = new Date().toISOString();
 
 const BASE_HEADERS = {
   'access-control-allow-origin': '*',
@@ -440,7 +469,7 @@ export default {
       return json({
         service: 'tefrija-stream-resolver',
         version: FLOW_VERSION,
-        updatedAt: FLOW_UPDATED_AT,
+        updatedAt: new Date().toISOString(),
         endpoints: {flow: '/v1/flow', raw: '/v1/flow/raw'},
       });
     }
@@ -465,7 +494,7 @@ export default {
       return json(
         {
           version: FLOW_VERSION,
-          updatedAt: FLOW_UPDATED_AT,
+          updatedAt: new Date().toISOString(),
           servedAt: new Date().toISOString(),
           script: FLOW_SCRIPT,
         },

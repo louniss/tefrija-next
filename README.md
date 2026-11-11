@@ -95,3 +95,55 @@ To learn more about React Native, take a look at the following resources:
 - [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
 - [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
 - [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+
+# Stream resolver flow (remote)
+
+The JavaScript that turns a movie/episode into a playable `master.m3u8` URL is
+**not** hand-written in the app bundle. It lives in [worker.js](./worker.js) and
+is consumed by [resolveFlow.js](./src/components/resolveFlow.js) and
+[FetchVideoComponent.js](./src/components/FetchVideoComponent.js).
+
+## How it runs
+
+1. The flow is downloaded from the worker once and cached in `AsyncStorage`;
+   the copy bundled in [defaultFlow.js](./src/components/defaultFlow.js) is used
+   when the worker is unreachable and nothing is cached yet.
+2. It is injected into a hidden `WebView`, which walks the provider chain:
+   embed page → `/vs_src.php` gate token → player-host landing page →
+   nested player page (`window.CONFIG.apiToken`) → `&stream_urls` API →
+   `<stream-host>/generate.php` playlist token.
+3. If resolution fails, the flow is downloaded again. A **new version** is
+   retried immediately; the **same version** means the provider is broken, so
+   the player shows "Media streaming is currently facing issues. Please try
+   again later."
+
+## Fixing a provider change
+
+1. Edit `FLOW_SCRIPT` in [worker.js](./worker.js).
+2. `npm run sync-flow` — regenerates the bundled copy so both agree byte for
+   byte (same content ⇒ same version hash).
+3. Upload `worker.js` to Cloudflare. Installed apps pick the new flow up on
+   their next failed attempt; no app release needed.
+
+The version in `/v1/flow` is a content hash of `FLOW_SCRIPT`, so it changes
+whenever the script does.
+
+Worker routes:
+
+| Route | Description |
+| --- | --- |
+| `GET /` | service name, current flow version, available routes |
+| `GET /v1/flow` | `{version, updatedAt, servedAt, script}` — what the app reads |
+| `GET /v1/flow/raw` | the raw flow script as `text/plain` |
+
+Notable provider requirements the flow encodes (they change):
+
+- the landing page only answers with a `Referer` from the embed page, so the
+  hop is done in-page with `location.replace`;
+- `data.vidsrc.sh/api.php?...&stream_urls` needs the single-use `api_token`
+  minted in the nested player page's `window.CONFIG`, and `stream_urls` comes
+  back WASM-encrypted (`vsdec.js` exposes `vsFetchJSON`);
+- that same `api_token` must be forwarded to `<stream-host>/generate.php` as
+  `?api_token=`, otherwise it answers `403 invalid or mismatched api token`;
+- stream hosts rotate per request (`nectarandnectary.space`,
+  `indigoinksociety.space`, …), so never hardcode them.

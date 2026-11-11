@@ -5,11 +5,7 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 
 import {View} from 'react-native';
 
-import {
-  STREAM_UNAVAILABLE_MESSAGE,
-  getFlow,
-  refreshFlow,
-} from './resolveFlow';
+import {STREAM_UNAVAILABLE_MESSAGE, getFlow, refreshFlow} from './resolveFlow';
 
 const EMBED_ORIGIN = 'https://vsembed.ru';
 
@@ -82,9 +78,17 @@ export const FetchVideoComponent = ({
     let cancelled = false;
     getFlow()
       .then(loaded => {
-        if (!cancelled) {
-          setFlow(loaded);
+        if (cancelled) {
+          return;
         }
+        console.log(
+          'resolve flow',
+          loaded.version,
+          loaded.source === 'bundled'
+            ? '(bundled fallback)'
+            : '(remote/cached)',
+        );
+        setFlow(loaded);
       })
       .catch(e => {
         console.log('resolve flow unavailable', e);
@@ -108,30 +112,6 @@ export const FetchVideoComponent = ({
     doneRef.current = false;
     refreshedRef.current = false;
   }, [embedUrl]);
-
-  /**
-   * Fallback for the stream token: the flow normally appends it from inside the
-   * page, but an older remote flow may hand us a bare URL.
-   */
-  const withStreamToken = async m3u8Url => {
-    if (/[?&]token=/.test(m3u8Url)) {
-      return m3u8Url;
-    }
-    try {
-      const origin = new URL(m3u8Url).origin;
-      const resp = await fetch(`${origin}/generate.php`, {
-        headers: {'user-agent': USER_AGENT},
-      });
-      const token = (await resp.text()).trim();
-      if (token && token.split('.').length === 3) {
-        const sep = m3u8Url.includes('?') ? '&' : '?';
-        return `${m3u8Url}${sep}token=${encodeURIComponent(token)}`;
-      }
-    } catch (e) {
-      console.log('stream token fetch failed', e);
-    }
-    return m3u8Url;
-  };
 
   const recover = useCallback(
     async reason => {
@@ -181,10 +161,11 @@ export const FetchVideoComponent = ({
 
     switch (data.type) {
       case 'm3u8': {
+        // The flow mints the playlist token itself (it needs the page's
+        // api_token, which only exists inside the WebView), so pass it through.
         doneRef.current = true;
-        const url = await withStreamToken(data.url);
-        console.log('m3u8 found', url);
-        onDoneRef.current(url);
+        console.log('m3u8 found', data.url);
+        onDoneRef.current(data.url);
         break;
       }
 
