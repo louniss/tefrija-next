@@ -81,6 +81,29 @@ const useStreamStore = create(
         }));
       },
 
+      /** Stops a running download but keeps what already arrived. */
+      pauseDownload(key) {
+        const current = get().downloads[key];
+        if (!current || current.status !== 'downloading') {
+          return;
+        }
+        set(state => ({
+          downloads: {
+            ...state.downloads,
+            [key]: {...current, status: 'paused', updatedAt: Date.now()},
+          },
+        }));
+      },
+
+      /** Continues a paused (or failed) download from the cached chunks. */
+      resumeDownload(key) {
+        const current = get().downloads[key];
+        if (!current) {
+          return;
+        }
+        get().setDownload(key, {status: 'queued', error: null});
+      },
+
       clearDownload(key) {
         const downloads = {...get().downloads};
         delete downloads[key];

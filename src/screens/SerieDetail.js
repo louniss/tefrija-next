@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Button, Caption, Divider, Icon, Menu, Subheading, IconButton } from 'react-native-paper';
+import { Button, Caption, Divider, Icon, Menu, Subheading, IconButton, useTheme } from 'react-native-paper';
 
 import {
   FlatList,
@@ -14,7 +14,13 @@ import { moviedb } from '../movieDb';
 import useMainState from '../state/Main';
 import useStreamStore, { streamKey } from '../stream/store';
 
-const downloadEpisode = ({ serie, seasonNumber, episodeNumber, stillPath }) => {
+const downloadEpisode = ({
+  serie,
+  seasonNumber,
+  episodeNumber,
+  stillPath,
+  episodeTitle,
+}) => {
   useStreamStore.getState().queueDownload({
     key: streamKey({
       type: 'tv',
@@ -27,11 +33,31 @@ const downloadEpisode = ({ serie, seasonNumber, episodeNumber, stillPath }) => {
     season: seasonNumber,
     episode: episodeNumber,
     title: serie.title,
-    poster: stillPath
-      ? `https://image.tmdb.org/t/p/w200/${stillPath}`
-      : serie.image,
+    // The show poster heads the group, the still identifies the episode.
+    poster: serie.image,
+    still: stillPath ? `https://image.tmdb.org/t/p/w200/${stillPath}` : '',
+    episodeTitle: episodeTitle || '',
     year: serie.year,
   });
+};
+
+const downloadIcon = item => {
+  if (!item) {
+    return 'download';
+  }
+  switch (item.status) {
+    case 'completed':
+      return 'check-circle';
+    case 'downloading':
+    case 'queued':
+      return 'progress-download';
+    case 'paused':
+      return 'pause-circle';
+    case 'error':
+      return 'alert-circle';
+    default:
+      return 'download';
+  }
 };
 
 const SerieDetails = ({ navigation, route }) => {
@@ -45,6 +71,7 @@ const SerieDetails = ({ navigation, route }) => {
   const [menuVisible, setMenuVisible] = useState(false);
 
   const state = useMainState();
+  const theme = useTheme();
 
   // Load show overview (seasons) when serie changes
   useEffect(() => {
@@ -140,10 +167,11 @@ const SerieDetails = ({ navigation, route }) => {
           <Caption style={{ padding: 10 }}>{episode.episode_number}</Caption>
           <Caption style={{ padding: 10, flex: 1 }}>{episode.name}</Caption>
           <IconButton
-            icon={
-              download && download.status === 'completed'
-                ? 'check-circle'
-                : 'download'
+            icon={downloadIcon(download)}
+            iconColor={
+              download && download.status !== 'completed'
+                ? theme.colors.primary
+                : undefined
             }
             size={20}
             onPress={() =>
@@ -152,6 +180,7 @@ const SerieDetails = ({ navigation, route }) => {
                 seasonNumber: episode.season_number,
                 episodeNumber: episode.episode_number,
                 stillPath: episode.still_path,
+                episodeTitle: episode.name,
               })
             }
           />
@@ -208,6 +237,7 @@ const SerieDetails = ({ navigation, route }) => {
               seasonNumber: item.season_number,
               episodeNumber: item.episode_number,
               stillPath: item.still_path,
+              episodeTitle: item.name,
             }),
           );
         }}>

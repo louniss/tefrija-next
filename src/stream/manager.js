@@ -383,6 +383,17 @@ export const downloadStream = async (record, variantIndex) => {
     }
   }
 
+  const isCancelled = () => {
+    const current = useStreamStore.getState().downloads[record.key];
+    return !current || current.status !== 'downloading';
+  };
+
+  // The user may have paused or removed the item while it was being prepared.
+  const entry = store.downloads[record.key];
+  if (!entry || (entry.status !== 'downloading' && entry.status !== 'queued')) {
+    return {cancelled: true, done: 0, total};
+  }
+
   let done = total - missing.length;
   store.setDownload(record.key, {
     status: 'downloading',
@@ -393,11 +404,6 @@ export const downloadStream = async (record, variantIndex) => {
   if (done) {
     console.log('download resumes', record.key, done, '/', total);
   }
-
-  const isCancelled = () => {
-    const current = useStreamStore.getState().downloads[record.key];
-    return !current || current.status !== 'downloading';
-  };
 
   const queue = [...missing];
   const failed = [];

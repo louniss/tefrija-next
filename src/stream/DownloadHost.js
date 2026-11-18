@@ -11,10 +11,15 @@ import {
 } from './manager';
 import useStreamStore from './store';
 
-const nextJobOf = downloads =>
+/** Items that want to run right now, oldest first. Paused ones stay out. */
+const activeJobsOf = downloads =>
   Object.values(downloads)
     .filter(item => item.status === 'queued' || item.status === 'downloading')
-    .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0))[0] || null;
+    .sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
+
+/* Items downloading at the same time — a whole season does not have to wait
+ * for the previous episode to finish. */
+const MAX_CONCURRENT_DOWNLOADS = 3;
 
 /**
  * Runs the download queue.
@@ -32,14 +37,18 @@ const nextJobOf = downloads =>
 export const DownloadHost = () => {
   const downloads = useStreamStore(state => state.downloads);
   const streams = useStreamStore(state => state.streams);
-  const runningRef = useRef(false);
+  const runningRef = useRef(new Set());
   /* A long download can outlive its playlist token or hit a CDN hiccup; one
    * automatic re-resolve resumes it from the chunks already on disk. */
   const retriesRef = useRef({});
 
-  const job = useMemo(() => nextJobOf(downloads), [downloads]);
-  const record = job ? streams[job.key] : null;
-  const needsResolve = !!job && !record;
+  const jobs = useMemo(() => activeJobsOf(downloads), [downloads]);
+  // One item at a time is resolved (a single hidden WebView drives the flow);
+  // everything already resolved downloads in parallel.
+  const resolveJob = useMemo(
+    () => jobs.find(item => !streams[item.key]) || null,
+    [jobs, streams],
+  );
 
   const runDownload = useCallback(async item => {
     const store = useStreamStore.getState();
@@ -86,14 +95,17 @@ export const DownloadHost = () => {
   }, []);
 
   useEffect(() => {
-    if (!job || !record || runningRef.current) {
-      return;
+    for (const job of jobs) {
+      if (runningRef.current.size >= MAX_CONCURRENT_DOWNLOADS) {
+        break;
+      }
+      if (runningRef.current.has(job.key) || !streams[job.key]) {
+        continue;
+      }
+      runningRef.current.add(job.key);
+      runDownload(job).finally(() => runningRef.current.delete(job.key));
     }
-    runningRef.current = true;
-    runDownload(job).finally(() => {
-      runningRef.current = false;
-    });
-  }, [job, record, runDownload]);
+  }, [jobs, streams, runDownload]);
 
   const handleResolved = useCallback(async (item, resolved) => {
     try {
@@ -126,19 +138,20 @@ export const DownloadHost = () => {
     store.setDownload(item.key, {status: 'error', error: message});
   }, []);
 
-  if (!needsResolve) {
+  if (!resolveJob) {
     return null;
   }
 
   return (
     <View style={{width: 1, height: 1, position: 'absolute', opacity: 0}}>
       <FetchVideoComponent
-        id={job.id}
-        type={job.type}
-        season={job.season}
-        episode={job.episode}
-        onDone={resolved => handleResolved(job, resolved)}
-        onError={message => handleError(job, message)}
+        key={resolveJob.key}
+        id={resolveJob.id}
+        type={resolveJob.type}
+        season={resolveJob.season}
+        episode={resolveJob.episode}
+        onDone={resolved => handleResolved(resolveJob, resolved)}
+        onError={message => handleError(resolveJob, message)}
       />
     </View>
   );

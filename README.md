@@ -156,6 +156,15 @@ counted from what is already on disk, so navigating away (or restarting) resumes
 a download instead of restarting it. Removing a download from the list cancels
 it.
 
+Up to three items download at the same time (three chunks each), so a whole
+season does not wait for the previous episode to finish.
+
+The downloads screen groups episodes under their show, shows the progress of
+each one as a percentage, and offers play / pause / resume per row; deleting a
+download asks for confirmation first and then removes its files. Series details
+show the state of every episode on its download button (`progress-download`
+while it runs, `pause-circle` when paused, `check-circle` when stored).
+
 Chunks are stored per quality under a name derived from the *resolution*
 (`tefrija-streams/<key>/1920x800/…`), because the provider reorders qualities and
 reports a different bandwidth on every resolve.

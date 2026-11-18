@@ -53,6 +53,9 @@ const VideoPlayerScreen = ({route}) => {
 
   useEffect(() => {
     async function fetchSubtitle() {
+      if (!imdbId) {
+        return;
+      }
       const id = imdbId.split('tt')[1];
       const subs = await subtitleManager.fetchSubtitleLinks(id, selectedLang);
 
