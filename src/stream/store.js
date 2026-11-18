@@ -81,6 +81,38 @@ const useStreamStore = create(
         }));
       },
 
+      /**
+       * Refreshes the show metadata on existing downloads. The title belongs to
+       * the show, not to the row that created it, so opening the show page is
+       * the moment to correct names written by an older (or wrong) entry.
+       */
+      syncDownloadMeta({type, id, title, poster, year}) {
+        const downloads = {...get().downloads};
+        let changed = false;
+        Object.values(downloads).forEach(item => {
+          if (item.type !== type || String(item.id) !== String(id)) {
+            return;
+          }
+          const patch = {};
+          if (title && item.title !== title) {
+            patch.title = title;
+          }
+          if (poster && item.poster !== poster) {
+            patch.poster = poster;
+          }
+          if (year && item.year !== year) {
+            patch.year = year;
+          }
+          if (Object.keys(patch).length) {
+            downloads[item.key] = {...item, ...patch};
+            changed = true;
+          }
+        });
+        if (changed) {
+          set({downloads});
+        }
+      },
+
       /** Stops a running download but keeps what already arrived. */
       pauseDownload(key) {
         const current = get().downloads[key];

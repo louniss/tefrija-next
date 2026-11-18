@@ -87,6 +87,14 @@ const SerieDetails = ({ navigation, route }) => {
         if (!serie.image && res.poster_path) {
           serie.image = `https://image.tmdb.org/t/p/w500/${res.poster_path}`;
         }
+        // Downloads are labelled by show, so keep them in step with the show.
+        useStreamStore.getState().syncDownloadMeta({
+          type: 'tv',
+          id: serie.id,
+          title: serie.title,
+          poster: serie.image,
+          year: serie.year,
+        });
       })
       .catch(() => { })
       .finally(() => setLoading(false));

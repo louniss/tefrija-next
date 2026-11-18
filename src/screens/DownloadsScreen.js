@@ -64,12 +64,20 @@ const buildGroups = items => {
         poster: item.poster,
         year: item.year,
         episodes: [],
-        updatedAt: item.updatedAt || 0,
+        updatedAt: 0,
       });
     }
     const group = groups.get(id);
     group.episodes.push(item);
-    group.updatedAt = Math.max(group.updatedAt, item.updatedAt || 0);
+    // The show's name belongs to the show, not to the row that happens to sort
+    // first: take it from the most recent entry, so a stale title on an old
+    // episode cannot title the whole group.
+    if ((item.updatedAt || 0) >= (group.updatedAt || 0)) {
+      group.updatedAt = item.updatedAt || 0;
+      group.title = item.title || group.title;
+      group.poster = item.poster || group.poster;
+      group.year = item.year || group.year;
+    }
   });
 
   return [...groups.values()]
@@ -103,9 +111,51 @@ const Action = ({icon, onPress, label, color}) => (
   </TouchableOpacity>
 );
 
-const RowActions = ({item, onPlay, onPause, onResume, onDelete, theme}) => (
+/** Thumbnail that plays on tap: the play affordance lives on the artwork. */
+const PlayThumbnail = ({uri, onPlay, width, height, radius = 6}) => (
+  <TouchableOpacity
+    onPress={onPlay}
+    accessibilityLabel="Play"
+    accessibilityRole="button"
+    style={{
+      width,
+      height,
+      borderRadius: radius,
+      overflow: 'hidden',
+      backgroundColor: '#222',
+    }}>
+    {uri ? (
+      <Image source={{uri}} style={{width, height}} />
+    ) : (
+      <View style={{flex: 1, backgroundColor: '#333'}} />
+    )}
+    <View
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}>
+      <View
+        style={{
+          width: 26,
+          height: 26,
+          borderRadius: 13,
+          backgroundColor: 'rgba(0,0,0,0.55)',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Icon source="play" size={16} color="#fff" />
+      </View>
+    </View>
+  </TouchableOpacity>
+);
+
+const RowActions = ({item, onPause, onResume, onDelete, theme}) => (
   <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 6}}>
-    <Action icon="play" label="Play" onPress={onPlay} />
     {isRunning(item) ? (
       <Action icon="pause" label="Pause" onPress={onPause} />
     ) : item.status === 'paused' || item.status === 'error' ? (
@@ -122,12 +172,15 @@ const RowActions = ({item, onPlay, onPause, onResume, onDelete, theme}) => (
 
 const EpisodeRow = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
   <View style={{flexDirection: 'row', alignItems: 'center', paddingVertical: 4}}>
-    {item.still ? (
-      <Image
-        source={{uri: item.still}}
-        style={{width: 56, height: 34, borderRadius: 4, marginRight: 8}}
+    <View style={{marginRight: 8}}>
+      <PlayThumbnail
+        uri={item.still}
+        onPlay={onPlay}
+        width={64}
+        height={38}
+        radius={4}
       />
-    ) : null}
+    </View>
     <View style={{flex: 1}}>
       <Text numberOfLines={1} style={{fontSize: 13}}>
         {episodeLabel(item)} {item.episodeTitle || ''}
@@ -144,7 +197,6 @@ const EpisodeRow = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
     <RowActions
       item={item}
       theme={theme}
-      onPlay={onPlay}
       onPause={onPause}
       onResume={onResume}
       onDelete={onDelete}
@@ -155,12 +207,7 @@ const EpisodeRow = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
 const MovieCard = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
   <Card style={{margin: 5}}>
     <View style={{flexDirection: 'row', padding: 8}}>
-      {item.poster ? (
-        <Image
-          source={{uri: item.poster}}
-          style={{width: 60, height: 90, borderRadius: 6}}
-        />
-      ) : null}
+      <PlayThumbnail uri={item.poster} onPlay={onPlay} width={60} height={90} />
       <View style={{flex: 1, paddingLeft: 10, justifyContent: 'center'}}>
         <Subheading numberOfLines={2}>{item.title || item.key}</Subheading>
         {item.year ? <Caption>{item.year}</Caption> : null}
@@ -174,7 +221,6 @@ const MovieCard = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
       <RowActions
         item={item}
         theme={theme}
-        onPlay={onPlay}
         onPause={onPause}
         onResume={onResume}
         onDelete={onDelete}

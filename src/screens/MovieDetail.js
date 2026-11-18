@@ -32,6 +32,13 @@ const MovieDetail = ({navigation, route}) => {
       })
       .then(res => {
         setMovie(res);
+        useStreamStore.getState().syncDownloadMeta({
+          type: 'movie',
+          id: res.id,
+          title: res.title,
+          poster: `https://image.tmdb.org/t/p/w200/${res.poster_path}`,
+          year: (res.release_date || '').split('-')[0],
+        });
       });
   }, [route.params?.movie?.id]);
 
