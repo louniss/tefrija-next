@@ -130,6 +130,7 @@ const FLOW_SCRIPT = `
     post('m3u8', {
       url: url,
       tokened: true,
+      docUrl: location.href,
       docOrigin: location.origin,
       playerUrl: playerPageUrl
         ? (function () {

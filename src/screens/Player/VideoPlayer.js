@@ -234,6 +234,7 @@ const VideoPlayerScreen = ({route}) => {
                 episode,
                 masterUrl: resolved.url,
                 playerUrl: resolved.playerUrl,
+                docUrl: resolved.docUrl,
                 docOrigin: resolved.docOrigin,
                 title: watched ? watched.title : '',
                 poster: watched ? watched.image : '',

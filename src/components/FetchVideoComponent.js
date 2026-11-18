@@ -181,6 +181,7 @@ export const FetchVideoComponent = ({
         onDoneRef.current({
           url: data.url,
           playerUrl: data.playerUrl || '',
+          docUrl: data.docUrl || '',
           docOrigin: data.docOrigin || '',
         });
         break;

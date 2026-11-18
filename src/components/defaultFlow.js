@@ -100,6 +100,7 @@ const FLOW_SCRIPT = `
     post('m3u8', {
       url: url,
       tokened: true,
+      docUrl: location.href,
       docOrigin: location.origin,
       playerUrl: playerPageUrl
         ? (function () {
@@ -395,6 +396,6 @@ const FLOW_SCRIPT = `
 `;
 
 export const DEFAULT_FLOW = {
-  version: '141c01ff-2f7f',
+  version: '8f5702ac-2f9c',
   script: FLOW_SCRIPT,
 };

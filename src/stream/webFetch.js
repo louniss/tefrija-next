@@ -17,7 +17,7 @@ import {originOf} from './playlists';
  * it one page at a time, keyed by an incrementing id.
  */
 
-const LOAD_TIMEOUT_MS = 20000;
+const LOAD_TIMEOUT_MS = 12000;
 const REQUEST_TIMEOUT_MS = 45000;
 
 /** Installed in every document before the page's own scripts run. */
@@ -59,6 +59,11 @@ true;
 
 let hostRef = null;
 let loadedDocument = null;
+/**
+ * Which document worked for a given origin. A context that answered once keeps
+ * answering (until its page/token dies), so probing is only paid once.
+ */
+const bestDocument = new Map();
 let readyPromise = null;
 let readyResolve = null;
 let readyReject = null;
@@ -71,6 +76,10 @@ const settleReady = (error) => {
   readyPromise = null;
   readyResolve = null;
   readyReject = null;
+  if (error) {
+    // A document that could not be loaded must not be reused as a fetch context.
+    loadedDocument = null;
+  }
   if (!resolve) {
     return;
   }
@@ -119,24 +128,7 @@ export function prepareWebFetch(documentUrl) {
   return pendingReady.finally(() => clearTimeout(timer));
 }
 
-/**
- * Fetches `url` from inside the WebView, loading its origin first when needed.
- * Text responses come back as strings, chunks as base64.
- */
-export async function webFetch(
-  url,
-  {binary = false, document, credentials = 'omit'} = {},
-) {
-  let documentUrl = document;
-  if (!documentUrl) {
-    try {
-      documentUrl = `${originOf(url)}/`;
-    } catch (e) {
-      throw new Error(`bad url ${url}`);
-    }
-  }
-  await prepareWebFetch(documentUrl);
-
+const request = async (url, {binary, credentials}) => {
   const id = `${Date.now()}-${++nextId}`;
   const result = new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -147,23 +139,109 @@ export async function webFetch(
   });
 
   hostRef.inject(
-    `window.__tefFetch(${JSON.stringify(id)}, ${JSON.stringify(url)}, ${
-      binary ? 'true' : 'false'
-    }, ${JSON.stringify(credentials)}); true;`,
+    `(function () {
+      var id = ${JSON.stringify(id)};
+      if (typeof window.__tefFetch !== 'function') {
+        // The page navigated itself somewhere else (provider ads do this), so
+        // the bootstrap is gone. Report it at once instead of waiting for the
+        // request timeout.
+        try {
+          window.ReactNativeWebView.postMessage(
+            JSON.stringify({id: id, error: 'fetcher missing'}),
+          );
+        } catch (e) {}
+        return;
+      }
+      window.__tefFetch(id, ${JSON.stringify(url)}, ${
+        binary ? 'true' : 'false'
+      }, ${JSON.stringify(credentials)});
+    })(); true;`,
   );
 
   return result;
+};
+
+/** Issues the request from `documentUrl`; throws on a bad status. */
+const sendFrom = async (url, documentUrl, {binary, credentials}) => {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await prepareWebFetch(documentUrl);
+    try {
+      const response = await request(url, {binary, credentials});
+      if (response.status >= 400) {
+        const error = new Error(`web fetch HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      return response;
+    } catch (e) {
+      if (attempt === 0 && /fetcher missing/.test(e.message || '')) {
+        // The document navigated itself away; load it again and retry.
+        loadedDocument = null;
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error('web fetch failed');
+};
+
+/**
+ * Fetches `url` from inside the WebView. Text responses come back as strings,
+ * chunks as base64.
+ *
+ * `documents` are pages the request may be made from, best first: the
+ * provider's pages carry tokens that die with the session, so a caller passes
+ * every known context and the first one that answers is remembered for the rest
+ * of the process. Once a context is known, it is the only one used — a 403 then
+ * means "the resource is throttled", not "try another page".
+ */
+export async function webFetch(
+  url,
+  {binary = false, document, documents, credentials = 'omit'} = {},
+) {
+  const origin = originOf(url);
+  const known = bestDocument.get(origin);
+
+  if (known) {
+    try {
+      return await sendFrom(url, known, {binary, credentials});
+    } catch (e) {
+      if (!/fetcher missing/.test(e.message || '')) {
+        bestDocument.delete(origin);
+      }
+      throw e;
+    }
+  }
+
+  const candidates = [document, ...(documents || []), `${origin}/`].filter(
+    (candidate, index, all) => candidate && all.indexOf(candidate) === index,
+  );
+
+  let lastError = null;
+  for (const documentUrl of candidates) {
+    try {
+      const response = await sendFrom(url, documentUrl, {binary, credentials});
+      bestDocument.set(origin, documentUrl);
+      return response;
+    } catch (e) {
+      lastError = e;
+      bestDocument.delete(origin);
+    }
+  }
+  throw lastError || new Error(`web fetch failed: ${url}`);
 }
 
 export const WebFetchHost = () => {
   const ref = useRef(null);
   const [uri, setUri] = useState(null);
   const [loadToken, setLoadToken] = useState(0);
+  const requestedRef = useRef(null);
 
   useEffect(() => {
     const detach = attachWebFetchHost({
       load: (documentUrl) => {
         console.log('web fetch host load', String(documentUrl).slice(0, 90));
+        requestedRef.current = documentUrl;
         setUri(documentUrl);
         setLoadToken(n => n + 1);
       },
@@ -226,10 +304,25 @@ export const WebFetchHost = () => {
         sharedCookiesEnabled={true}
         injectedJavaScriptBeforeContentLoaded={BOOTSTRAP}
         source={{uri}}
+        // The provider's pages open ads in the same view; anything that is not
+        // the document the fetch needs is refused, otherwise the bootstrap is
+        // lost and every chunk request has to time out.
+        onShouldStartLoadWithRequest={request =>
+          !requestedRef.current ||
+          request.url === requestedRef.current ||
+          request.url === 'about:blank'
+        }
         onMessage={handleMessage}
         onHttpError={event => {
           const {statusCode, url} = event.nativeEvent;
-          console.log('web fetch host http', statusCode, String(url).slice(0, 90));
+          console.log(
+            'web fetch host http',
+            statusCode,
+            String(url).slice(0, 90),
+          );
+          // The provider's pages 404 when navigated to but answer a `fetch`
+          // fine, so a dead document only means "try another context".
+          settleReady(new Error(`document HTTP ${statusCode}`));
         }}
         onLoadEnd={event => {
           console.log(

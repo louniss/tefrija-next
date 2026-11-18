@@ -60,7 +60,11 @@ const Player = ({
           setPlayerError(false);
           setDuration(data.duration);
 
-          const time = state.getById(id).time;
+          // The player also opens for items that never went through
+          // "continue watching" (e.g. a download rewrite), so `getById` may be
+          // null here.
+          const watched = state.getById(id);
+          const time = watched ? watched.time : null;
           if (time) {
             if (type === 'tv') {
               if (time[season] && time[season][episode]) {

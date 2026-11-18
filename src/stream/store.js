@@ -56,6 +56,13 @@ const useStreamStore = create(
         return get().streams[key] || null;
       },
 
+      /** Forgets a resolved stream but keeps its download entry (and files). */
+      dropStream(key) {
+        const streams = {...get().streams};
+        delete streams[key];
+        set({streams});
+      },
+
       removeStream(key) {
         const downloads = {...get().downloads};
         delete downloads[key];

@@ -17,8 +17,20 @@ const ROOT = `${RNFS.DocumentDirectoryPath}/tefrija-streams`;
 
 export const keyToDir = key => `${ROOT}/${key.replace(/[^a-zA-Z0-9]+/g, '_')}`;
 
-export const segmentPath = (key, variantIndex, index) =>
-  `${keyToDir(key)}/${variantIndex}/${index}.ts`;
+/**
+ * Chunks are stored per quality, keyed by the resolution rather than by the
+ * quality's position in the playlist: a re-resolve may list the qualities in
+ * another order (or drop one), and its reported bandwidth changes between
+ * resolves, so neither index nor bandwidth identifies a quality reliably.
+ */
+const variantSignature = variant =>
+  (variant.resolution || 'auto').replace(/[^0-9x]/gi, '') || 'auto';
+
+export const variantDir = (key, variant) =>
+  `${keyToDir(key)}/${variant.dir || variantSignature(variant)}`;
+
+export const segmentPath = (key, variant, index) =>
+  `${variantDir(key, variant)}/${index}.ts`;
 
 const ensureDir = async dir => {
   if (!(await RNFS.exists(dir))) {
@@ -33,8 +45,29 @@ export const clearStreamFiles = async key => {
   }
 };
 
-export const segmentExists = (key, variantIndex, index) =>
-  RNFS.exists(segmentPath(key, variantIndex, index));
+export const segmentExists = (key, variant, index) =>
+  RNFS.exists(segmentPath(key, variant, index));
+
+/** Indices already on disk for one quality. */
+export const cachedIndices = async (record, variant) => {
+  try {
+    const dir = variantDir(record.key, variant);
+    if (!(await RNFS.exists(dir))) {
+      return new Set();
+    }
+    const files = await RNFS.readDir(dir);
+    const indices = new Set();
+    files.forEach(file => {
+      const match = /^(\d+)\.ts$/.exec(file.name);
+      if (match) {
+        indices.add(parseInt(match[1], 10));
+      }
+    });
+    return indices;
+  } catch (e) {
+    return new Set();
+  }
+};
 
 /**
  * True when every chunk of a quality is already on disk, i.e. the item can be
@@ -45,18 +78,20 @@ export const chunksComplete = async (record, variantIndex) => {
   if (!variant || !variant.segments.length) {
     return false;
   }
-  const dir = `${keyToDir(record.key)}/${variantIndex}`;
-  try {
-    if (!(await RNFS.exists(dir))) {
-      return false;
-    }
-    const files = await RNFS.readDir(dir);
-    const cached = files.filter(file => /^\d+\.ts$/.test(file.name)).length;
-    return cached >= variant.segments.length;
-  } catch (e) {
-    return false;
-  }
+  const cached = await cachedIndices(record, variant);
+  return cached.size >= variant.segments.length;
 };
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+/* The CDN starts answering 403 when chunks are pulled too fast; waiting and
+ * asking again is what turns that into a slow download instead of a failure. */
+const RETRY_DELAYS_MS = [5000, 15000, 30000];
+/* Chunks are small; three at a time keeps a download moving without looking
+ * like a burst to the CDN's rate limiting. */
+const DOWNLOAD_WORKERS = 3;
+const isThrottled = error =>
+  !error.status || error.status === 403 || error.status === 429 || error.status >= 500;
 
 /** Downloads one playlist/chunk and writes it to disk; returns the local path. */
 export const fetchSegmentToDisk = async (record, variantIndex, index) => {
@@ -65,20 +100,43 @@ export const fetchSegmentToDisk = async (record, variantIndex, index) => {
   if (!segment) {
     throw new Error(`unknown segment ${variantIndex}/${index}`);
   }
-  const path = segmentPath(record.key, variantIndex, index);
-  const dir = segmentPath(record.key, variantIndex, index).slice(
-    0,
-    path.lastIndexOf('/'),
-  );
+  const path = segmentPath(record.key, variant, index);
   await ensureDir(keyToDir(record.key));
-  await ensureDir(dir);
+  await ensureDir(variantDir(record.key, variant));
 
-  const response = await webFetch(withToken(segment.url, record.token), {
-    binary: true,
-    document: record.documentUrl || undefined,
-  });
-  if (response.status !== 200 || !response.b64) {
-    throw new Error(`segment HTTP ${response.status}`);
+  const segmentUrl = withToken(segment.url, record.token);
+  let response = null;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      response = await webFetch(segmentUrl, {
+        binary: true,
+        documents: record.fetchContexts || undefined,
+      });
+      if (response.status !== 200) {
+        const error = new Error(`segment HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      break;
+    } catch (e) {
+      console.log(
+        'chunk failed',
+        variantIndex,
+        index,
+        e.message,
+        'attempt',
+        attempt + 1,
+        segmentUrl.split('?')[0].slice(0, 100),
+      );
+      if (attempt === RETRY_DELAYS_MS.length || !isThrottled(e)) {
+        throw e;
+      }
+      await sleep(RETRY_DELAYS_MS[attempt]);
+      response = null;
+    }
+  }
+  if (!response || !response.b64) {
+    throw new Error(`segment unavailable ${variantIndex}/${index}`);
   }
   await RNFS.writeFile(path, response.b64, 'base64');
   return path;
@@ -88,7 +146,11 @@ const inFlight = new Map();
 
 /** A cached chunk, downloading it first when it is not on disk yet. */
 export const ensureSegment = async (record, variantIndex, index) => {
-  const path = segmentPath(record.key, variantIndex, index);
+  const variant = record.variants[variantIndex];
+  if (!variant) {
+    throw new Error(`unknown quality ${variantIndex}`);
+  }
+  const path = segmentPath(record.key, variant, index);
   if (await RNFS.exists(path)) {
     return path;
   }
@@ -103,9 +165,9 @@ export const ensureSegment = async (record, variantIndex, index) => {
   return job;
 };
 
-const loadVariant = async (key, token, baseUrl, variant, documentUrl) => {
+const loadVariant = async (key, token, baseUrl, variant, contexts) => {
   const url = withToken(variant.url, token);
-  const response = await webFetch(url, {document: documentUrl});
+  const response = await webFetch(url, {documents: contexts});
   if (response.status !== 200) {
     throw new Error(`playlist HTTP ${response.status}`);
   }
@@ -129,17 +191,50 @@ const loadVariant = async (key, token, baseUrl, variant, documentUrl) => {
  * qualities, their chunks, and the token that unlocks them. Playlists are read
  * once; after that playback only needs per-chunk downloads.
  */
-export const buildStreamRecord = async ({media, masterUrl, playerUrl, docOrigin}) => {
-  const token = tokenFromUrl(masterUrl);
-  const documentUrl = playerUrl || undefined;
-  console.log(
-    'stream context',
-    'player=',
-    String(playerUrl || '').slice(0, 90),
-    'doc=',
-    docOrigin,
+/**
+ * Pages the CDN accepts as the origin of a playlist request, best first.
+ *
+ * The provider's player page is ideal — its Referer is exactly what a real
+ * playback sends — but it answers `fetch` and refuses to be navigated to (it
+ * 404s), so the landing page and the site root are tried as fallbacks.
+ */
+const documentCandidates = ({playerUrl, docUrl, docOrigin}) => {
+  // The landing host's own root is the only stable context: player/landing urls
+  // carry tokens that are consumed after a single load, while a plain page on
+  // that host keeps working for the whole session.
+  const candidates = [
+    docOrigin ? `${docOrigin}/` : '',
+    playerUrl,
+    docUrl,
+  ];
+  return candidates.filter(
+    (url, index) => url && candidates.indexOf(url) === index,
   );
-  const response = await webFetch(masterUrl, {document: documentUrl});
+};
+
+/**
+ * Fetches the master playlist from the first context that answers it, and
+ * reports which context worked so the chunks are fetched the same way.
+ */
+const readMasterPlaylist = async (masterUrl, candidates) => {
+  const response = await webFetch(masterUrl, {documents: candidates});
+  if (response.status !== 200) {
+    throw new Error(`master playlist HTTP ${response.status}`);
+  }
+  return response;
+};
+
+export const buildStreamRecord = async ({
+  media,
+  masterUrl,
+  playerUrl,
+  docUrl,
+  docOrigin,
+}) => {
+  const token = tokenFromUrl(masterUrl);
+  const contexts = documentCandidates({playerUrl, docUrl, docOrigin});
+  console.log('stream contexts', contexts.length);
+  const response = await readMasterPlaylist(masterUrl, contexts);
   if (response.status !== 200) {
     throw new Error(`master playlist HTTP ${response.status}`);
   }
@@ -152,7 +247,7 @@ export const buildStreamRecord = async ({media, masterUrl, playerUrl, docOrigin}
     }
     const loaded = await Promise.all(
       parsed.map(variant =>
-        loadVariant(media.key, token, masterUrl, variant, documentUrl).catch(e => {
+        loadVariant(media.key, token, masterUrl, variant, contexts).catch(e => {
           console.log('quality unavailable', variant.resolution, e.message);
           return null;
         }),
@@ -182,6 +277,15 @@ export const buildStreamRecord = async ({media, masterUrl, playerUrl, docOrigin}
     throw new Error('no playable quality resolved');
   }
 
+  // A stable name per quality, so cached chunks survive a re-resolve.
+  const seen = new Map();
+  variants.forEach(variant => {
+    const base = variantSignature(variant);
+    const count = seen.get(base) || 0;
+    seen.set(base, count + 1);
+    variant.dir = count ? `${base}_${count}` : base;
+  });
+
   const best = pickDefaultVariant(variants);
   let host = '';
   try {
@@ -191,7 +295,7 @@ export const buildStreamRecord = async ({media, masterUrl, playerUrl, docOrigin}
   return {
     ...media,
     masterUrl,
-    documentUrl: documentUrl || '',
+    fetchContexts: contexts,
     token,
     host,
     variants,
@@ -208,6 +312,7 @@ export const prepareStream = async ({
   episode,
   masterUrl,
   playerUrl,
+  docUrl,
   docOrigin,
   title,
   poster,
@@ -237,6 +342,7 @@ export const prepareStream = async ({
     media,
     masterUrl,
     playerUrl,
+    docUrl,
     docOrigin,
   });
   console.log(
@@ -251,12 +357,13 @@ export const prepareStream = async ({
   return record;
 };
 
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 /**
- * Downloads every chunk of one quality, updating the store so the downloads
- * screen and the player both see progress. Already cached chunks are skipped,
- * which makes the call resumable after an interruption.
+ * Downloads every chunk of one quality.
+ *
+ * A few chunks are pulled at a time and progress starts from what is already on
+ * disk, so a retry resumes where the previous attempt stopped instead of
+ * starting over. A chunk that keeps failing is re-queued once at the end rather
+ * than blocking the rest of the download.
  */
 export const downloadStream = async (record, variantIndex) => {
   const store = useStreamStore.getState();
@@ -265,23 +372,70 @@ export const downloadStream = async (record, variantIndex) => {
     throw new Error('quality not available');
   }
   const total = variant.segments.length;
-  let done = 0;
-  store.setDownload(record.key, {status: 'downloading', total, done, error: null});
-
+  const cached = await cachedIndices(record, variant);
+  const missing = [];
   for (let index = 0; index < total; index++) {
-    // Removing the download from the list is the cancel signal.
+    if (!cached.has(index)) {
+      missing.push(index);
+    }
+  }
+
+  let done = total - missing.length;
+  store.setDownload(record.key, {
+    status: 'downloading',
+    total,
+    done,
+    error: null,
+  });
+  if (done) {
+    console.log('download resumes', record.key, done, '/', total);
+  }
+
+  const isCancelled = () => {
     const current = useStreamStore.getState().downloads[record.key];
-    if (!current || current.status !== 'downloading') {
-      console.log('download cancelled', record.key, done, '/', total);
-      return {cancelled: true, done, total};
+    return !current || current.status !== 'downloading';
+  };
+
+  const queue = [...missing];
+  const failed = [];
+  let cursor = 0;
+
+  const worker = async () => {
+    while (cursor < queue.length) {
+      if (isCancelled()) {
+        return;
+      }
+      const index = queue[cursor++];
+      try {
+        await fetchSegmentToDisk(record, variantIndex, index);
+        done += 1;
+        store.setDownload(record.key, {done, total});
+        if (done % 25 === 0) {
+          console.log('download progress', record.key, done, '/', total);
+        }
+      } catch (e) {
+        console.log('chunk parked', record.key, index, e.message);
+        failed.push(index);
+      }
     }
-    await ensureSegment(record, variantIndex, index);
-    done += 1;
-    store.setDownload(record.key, {done, total});
-    if (done % 5 === 0) {
-      // Keep the UI responsive between chunks.
-      await sleep(0);
-    }
+  };
+
+  const workers = [];
+  for (let i = 0; i < Math.min(DOWNLOAD_WORKERS, queue.length); i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+
+  if (isCancelled()) {
+    console.log('download cancelled', record.key, done, '/', total);
+    return {cancelled: true, done, total};
+  }
+
+  if (failed.length) {
+    const sample = failed.slice(0, 3).join(', ');
+    throw new Error(
+      `${failed.length} chunk${failed.length === 1 ? '' : 's'} unavailable (${sample})`,
+    );
   }
 
   store.setDownload(record.key, {status: 'completed', done: total, total});

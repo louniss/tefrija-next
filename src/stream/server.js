@@ -105,7 +105,7 @@ const handle = async request => {
     try {
       await ensureSegment(record, variantIndex, index);
       const b64 = await RNFS.readFile(
-        segmentPath(key, variantIndex, index),
+        segmentPath(key, variant, index),
         'base64',
       );
       return {

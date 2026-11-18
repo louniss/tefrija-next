@@ -19,7 +19,7 @@ import {DEFAULT_FLOW} from './defaultFlow';
  */
 
 export const RESOLVE_FLOW_ENDPOINT =
-  'https://lively-disk-1187.abcwork.workers.dev/v1/flow';
+  'http://10.0.2.2:8099/v1/flow';
 
 // Set the same value on the worker as FLOW_TOKEN to require it.
 const FLOW_TOKEN = '';
