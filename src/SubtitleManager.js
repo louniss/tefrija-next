@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import {unzip} from 'react-native-zip-archive';
 
@@ -5,6 +6,20 @@ const ass2srt = require('ass-to-srt');
 const iconv = require('iconv-lite');
 const RNFS = require('react-native-fs');
 const path = RNFS.DocumentDirectoryPath;
+
+/* Subtitles are downloaded once and kept: the search hits the network (which is
+ * often unreachable) while a stored copy is enough for every later playback. */
+const SUBTITLE_DIR = `${path}/subtitles`;
+const LINKS_PREFIX = 'tefrija.subtitleLinks.';
+
+const ensureSubtitleDir = async () => {
+  if (!(await RNFS.exists(SUBTITLE_DIR))) {
+    await RNFS.mkdir(SUBTITLE_DIR);
+  }
+};
+
+const subtitleCachePath = subtitleInfo =>
+  `${SUBTITLE_DIR}/${subtitleInfo.id}.txt`;
 
 const LANGS = [
   {title: 'Abkhazian', value: 'abk'},
@@ -121,8 +136,22 @@ class SubtitleManager {
     this.langs = LANGS;
   }
 
+  async getLocalSubtitle(subtitleInfo) {
+    try {
+      const file = subtitleCachePath(subtitleInfo);
+      if (await RNFS.exists(file)) {
+        const stored = JSON.parse(await RNFS.readFile(file, 'utf8'));
+        return stored;
+      }
+    } catch (e) {
+      console.log('could not read cached subtitle', subtitleInfo.id, e.message);
+    }
+    return null;
+  }
+
   async fetchSubtitleLinks(imdbId, lang) {
     const url = `https://rest.opensubtitles.org/search/imdbid-${imdbId}/sublanguageid-${lang}`;
+    const cacheKey = `${LINKS_PREFIX}${imdbId}-${lang}`;
     try {
       const response = await axios.get(url, {
         headers: {
@@ -132,7 +161,7 @@ class SubtitleManager {
         },
       });
 
-      return response.data.map(item => ({
+      const links = response.data.map(item => ({
         downloadUrl: item.ZipDownloadLink,
         subDownloadUrl: item.SubDownloadLink,
         format: item.SubFormat,
@@ -141,8 +170,17 @@ class SubtitleManager {
         fileName: item.SubFileName,
         downloads: item.SubDownloadsCnt,
       }));
+      AsyncStorage.setItem(cacheKey, JSON.stringify(links)).catch(() => {});
+      return links;
     } catch (error) {
       console.error('fetchSubtitleLinks error: ', error);
+      try {
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached) {
+          console.log('using cached subtitle links', imdbId, lang);
+          return JSON.parse(cached);
+        }
+      } catch (e) {}
       return [];
     }
   }
@@ -163,6 +201,12 @@ class SubtitleManager {
 
   async subtitleUrlToText(subtitleInfo) {
     try {
+      const cached = await this.getLocalSubtitle(subtitleInfo);
+      if (cached) {
+        console.log('using local subtitle', subtitleInfo.id);
+        return cached;
+      }
+
       const {downloadUrl, format, encoding, id} = subtitleInfo;
 
       const subtitleFileZipped = await this.saveZippedSubtitle(downloadUrl, id);
@@ -213,7 +257,18 @@ class SubtitleManager {
         );
       } catch (e) {}
 
-      return {arabicData, utf8Data};
+      const result = {arabicData, utf8Data};
+      try {
+        await ensureSubtitleDir();
+        await RNFS.writeFile(
+          subtitleCachePath(subtitleInfo),
+          JSON.stringify(result),
+          'utf8',
+        );
+      } catch (e) {
+        console.log('could not cache subtitle', id, e.message);
+      }
+      return result;
     } catch (error) {
       console.error(error);
       return null;

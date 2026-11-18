@@ -8,9 +8,12 @@ import useMainState from '../../state/Main';
 import {FetchVideoComponent} from '../../components/FetchVideoComponent';
 import SubtitleReader from '../../SubtitleReader';
 import SubtitleManager from '../../SubtitleManager';
+import {ensureStreamServer} from '../../stream/server';
+import {chunksComplete, localVariantUrl, prepareStream} from '../../stream/manager';
+import useStreamStore, {streamKey} from '../../stream/store';
+import {invalidateFlow} from '../../components/resolveFlow';
 
 import Player from './Player';
-import parse from './parse';
 
 const subtitleManager = new SubtitleManager();
 
@@ -29,6 +32,7 @@ const VideoPlayerScreen = ({route}) => {
   const [playerQualities, setPlayerQualities] = useState([]);
 
   const [alreadyOnDone, setAlreadyOnDone] = useState(false);
+  const [resolverAttempt, setResolverAttempt] = useState(0);
 
   const [subtitleText, setSubtitleText] = useState('');
 
@@ -90,6 +94,88 @@ const VideoPlayerScreen = ({route}) => {
     orientation: 'landscape',
   });
 
+  const mediaKey = streamKey({type, id, season, episode});
+  // Dev affordance: play a stream straight from its master url, bypassing the
+  // resolver, so the local server can be exercised on its own.
+  const injectedStream = __DEV__ ? route.params.streamUrl : null;
+
+  useEffect(() => {
+    if (!injectedStream) {
+      return;
+    }
+    prepareStream({
+      type,
+      id,
+      season,
+      episode,
+      masterUrl: injectedStream,
+      title: route.params.title,
+      poster: '',
+      year: '',
+    })
+      .then(playRecord)
+      .catch(e => {
+        console.log('injected stream failed', e.message);
+        setPlayerError(e.message || true);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectedStream]);
+
+  // A fully cached item plays from disk: no resolver, no network.
+  const [offlineRecord, setOfflineRecord] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    const stored = useStreamStore.getState().streams[mediaKey];
+    if (!stored) {
+      setOfflineRecord(null);
+      return;
+    }
+    const variant = stored.downloadedVariant ?? stored.defaultVariant;
+    chunksComplete(stored, variant).then(complete => {
+      if (!cancelled) {
+        setOfflineRecord(complete ? stored : null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mediaKey]);
+
+  const playRecord = async record => {
+    const port = await ensureStreamServer();
+    const variant = record.downloadedVariant ?? record.defaultVariant;
+    console.log(
+      'stream ready',
+      record.key,
+      'quality',
+      record.variants[variant].resolution || 'single',
+      'from',
+      record.downloadedVariant != null ? 'disk' : 'cache',
+    );
+    setPlayerQualities(
+      record.variants
+        .map((quality, index) => ({
+          resolution: quality.resolution || 'auto',
+          uri: localVariantUrl(port, record.key, index),
+          bandwidth: quality.bandwidth,
+        }))
+        .reverse(),
+    );
+    setIsDone(true);
+    setUri(localVariantUrl(port, record.key, variant));
+  };
+
+  useEffect(() => {
+    if (offlineRecord) {
+      playRecord(offlineRecord).catch(e => {
+        console.log('offline playback failed', e);
+        setOfflineRecord(null);
+      });
+    }
+    // Only when the offline record for this media changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offlineRecord]);
+
   return (
     <View style={styles.container}>
       <Player
@@ -125,49 +211,54 @@ const VideoPlayerScreen = ({route}) => {
         setSubtitleNumber={setSubtitleNumber}
       />
 
-      <FetchVideoComponent
-        id={id}
-        type={type}
-        season={season}
-        episode={episode}
-        onDone={async url => {
-          if (alreadyOnDone) {
-            return;
-          }
-          setAlreadyOnDone(true);
-
-          console.log('ondone playing this url: ', url);
-          setUri(url);
-          setIsDone(true);
-
-          const response = await fetch(url, {
-            method: 'GET',
-          });
-
-          const m3u8 = await response.text();
-
-          try {
-            console.log('parsing m3u8 content: ', m3u8);
-
-            let playlist = parse(m3u8);
-
-            const domain = url.match(/^(https?:\/\/[^\/]+)/)[1];
-
-            for (let item of playlist) {
-              item.uri = domain + item.uri;
+      {!offlineRecord && !injectedStream && (
+        <FetchVideoComponent
+          key={`resolver-${resolverAttempt}`}
+          id={id}
+          type={type}
+          season={season}
+          episode={episode}
+          onDone={async resolved => {
+            if (alreadyOnDone) {
+              return;
             }
-            console.log('parsed playlist: ', playlist);
+            setAlreadyOnDone(true);
 
-            setPlayerQualities(playlist);
-          } catch (e) {
-            console.log('error parsing qualities: ', e);
-          }
-        }}
-        onError={err => {
-          console.log('err', err);
-          setPlayerError(err || true);
-        }}
-      />
+            console.log('resolved stream url: ', resolved.url);
+            try {
+              const watched = state.getById(id);
+              const record = await prepareStream({
+                type,
+                id,
+                season,
+                episode,
+                masterUrl: resolved.url,
+                playerUrl: resolved.playerUrl,
+                docOrigin: resolved.docOrigin,
+                title: watched ? watched.title : '',
+                poster: watched ? watched.image : '',
+                year: watched ? watched.year : '',
+              });
+              await playRecord(record);
+            } catch (e) {
+              console.log('stream preparation failed', e);
+              // A url we cannot even read usually means the flow is stale, so
+              // ask for a newer one and give the resolver one more go.
+              if (resolverAttempt < 1) {
+                await invalidateFlow();
+                setAlreadyOnDone(false);
+                setResolverAttempt(n => n + 1);
+                return;
+              }
+              setPlayerError(e.message || true);
+            }
+          }}
+          onError={err => {
+            console.log('err', err);
+            setPlayerError(err || true);
+          }}
+        />
+      )}
     </View>
   );
 };

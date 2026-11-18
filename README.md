@@ -112,10 +112,62 @@ is consumed by [resolveFlow.js](./src/components/resolveFlow.js) and
    embed page → `/vs_src.php` gate token → player-host landing page →
    nested player page (`window.CONFIG.apiToken`) → `&stream_urls` API →
    `<stream-host>/generate.php` playlist token.
-3. If resolution fails, the flow is downloaded again. A **new version** is
+3. The flow returns the playlist url together with the **document it ran in**
+   (`docOrigin`) and the provider's player page (`playerUrl`). That context is
+   not cosmetic: the CDN only serves playlists and chunks to requests that come
+   from those pages, so the app keeps a hidden and fetches everything from
+   there (see "Local stream server" below).
+4. If resolution fails, the flow is downloaded again. A **new version** is
    retried immediately; the **same version** means the provider is broken, so
    the player shows "Media streaming is currently facing issues. Please try
-   again later."
+   again later." A resolution whose url cannot even be read also invalidates
+   the cached flow, since that is usually a stale flow rather than an outage.
+
+# Local stream server
+
+`react-native-video` (ExoPlayer) cannot talk to the provider: the CDN answers
+the app's own HTTP stack with a Cloudflare block page. Playback therefore goes
+through a loopback server instead.
+
+| Module | Role |
+| --- | --- |
+| [webFetch.js](./src/stream/webFetch.js) | hidden `WebView` that performs the actual CDN requests, in the page context the CDN accepts; binary responses come back base64 |
+| [playlists.js](./src/stream/playlists.js) | pure HLS helpers: parse master/media playlists and rewrite them to local urls |
+| [manager.js](./src/stream/manager.js) | turns a resolved url into a stream record (qualities + chunks) and downloads/caches chunks |
+| [server.js](./src/stream/server.js) | `react-native-nitro-http-server` on `127.0.0.1`: serves the ghost playlists and the chunks |
+| [store.js](./src/stream/store.js) | zustand + AsyncStorage state (resolved streams and download progress) |
+| [DownloadHost.js](./src/stream/DownloadHost.js) | runs the download queue, resolving unseen items with a hidden `FetchVideoComponent` |
+
+Flow of a playback:
+
+1. the resolved `master.m3u8` is read once and its qualities/chunk lists are
+   stored, so the player never re-reads a playlist mid-session;
+2. the player is pointed at `http://127.0.0.1:<port>/s/<key>/<quality>/playlist.m3u8`
+   (the best quality by default, every quality is offered in the menu);
+3. each chunk request is answered from `DocumentDirectoryPath/tefrija-streams`
+   or, on a miss, downloaded through the WebView first;
+4. once every chunk of a quality is on disk the item plays with no network at
+   all — the cached stream record supplies the playlist.
+
+Downloads ([DownloadsScreen.js](./src/screens/DownloadsScreen.js), plus buttons
+on the movie/episode screens) reuse the same machinery: an item is resolved,
+then its chunks are fetched one by one and progress is kept in the store, so
+navigating away (or restarting) neither loses nor restarts the download.
+Removing a download from the list cancels it.
+
+Subtitles are cached the same way: the search result list and the decoded
+subtitle text are stored under `DocumentDirectoryPath/subtitles`, and a cached
+copy is used before going back to the network.
+
+## Debugging on a device
+
+[scripts/rn-probe.js](./scripts/rn-probe.js) attaches to the running app through
+Metro's CDP proxy: `--logs` tails console output, `--eval "..."` and
+`--eval-async "..."` run code in the app's JS runtime.
+
+[scripts/flow-server.js](./scripts/flow-server.js) serves `FLOW_SCRIPT` over
+`http://10.0.2.2:8099/v1/flow` so flow edits can be tried on an emulator without
+deploying the worker (point `RESOLVE_FLOW_ENDPOINT` at it temporarily).
 
 ## Fixing a provider change
 
@@ -146,7 +198,12 @@ Notable provider requirements the flow encodes (they change):
 - that same `api_token` must be forwarded to `<stream-host>/generate.php` as
   `?api_token=`, otherwise it answers `403 invalid or mismatched api token`;
 - stream hosts rotate per request (`nectarandnectary.space`,
-  `indigoinksociety.space`, …), so never hardcode them.
+  `indigoinksociety.space`, …), so never hardcode them;
+- the playlist/chunk CDN refuses requests whose document is not one of the
+  provider's pages (a direct visit, `curl`, okhttp and ExoPlayer all get the
+  Cloudflare block page), and it does not send CORS headers for credentialed
+  requests — the fetch must be made with `credentials: 'omit'` from the
+  provider's own page for the response to be readable.
 
 The flow deliberately **fails** when it cannot mint a playlist token instead of
 returning a bare `master.m3u8`. A tokenless URL only surfaces later as a player

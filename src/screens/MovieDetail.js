@@ -12,11 +12,15 @@ import {
 
 import {moviedb} from '../movieDb';
 import useMainState from '../state/Main';
+import useStreamStore, {streamKey} from '../stream/store';
 import Animated from 'react-native-reanimated';
 
 const MovieDetail = ({navigation, route}) => {
   const [movie, setMovie] = React.useState({});
   const state = useMainState();
+  const downloads = useStreamStore(store => store.downloads);
+  const downloadKey = movie.id ? streamKey({type: 'movie', id: movie.id}) : null;
+  const download = downloadKey ? downloads[downloadKey] : null;
 
   useEffect(() => {
     const movieParam = route.params?.movie;
@@ -32,6 +36,42 @@ const MovieDetail = ({navigation, route}) => {
   }, [route.params?.movie?.id]);
 
   const [loading, setLoading] = React.useState(false);
+
+  const startDownload = () => {
+    if (!movie.id) {
+      return;
+    }
+    useStreamStore.getState().queueDownload({
+      key: streamKey({type: 'movie', id: movie.id}),
+      id: movie.id,
+      type: 'movie',
+      season: null,
+      episode: null,
+      title: movie.title,
+      poster: `https://image.tmdb.org/t/p/w200/${movie.poster_path}`,
+      year: (movie.release_date || '').split('-')[0],
+    });
+  };
+
+  const downloadLabel = () => {
+    if (!download) {
+      return 'Download';
+    }
+    switch (download.status) {
+      case 'completed':
+        return 'Downloaded';
+      case 'downloading':
+        return download.total
+          ? `Downloading ${download.done}/${download.total}`
+          : 'Preparing…';
+      case 'queued':
+        return 'Queued';
+      case 'error':
+        return 'Retry download';
+      default:
+        return 'Download';
+    }
+  };
 
   const play = () => {
     state.addToContinueWatching({
@@ -100,10 +140,14 @@ const MovieDetail = ({navigation, route}) => {
         <Button
           style={{margin: 5, borderRadius: 5}}
           mode="contained-tonal"
-          disabled={true}
-          loading={loading}
-          icon="download">
-          Download
+          disabled={
+            !movie.id ||
+            (download &&
+              (download.status === 'downloading' || download.status === 'queued'))
+          }
+          onPress={startDownload}
+          icon={download && download.status === 'completed' ? 'check' : 'download'}>
+          {downloadLabel()}
         </Button>
         <Button
           style={{margin: 5, borderRadius: 5}}

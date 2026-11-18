@@ -20,6 +20,10 @@ import PopularMoviesScreen from './screens/PopularMoviesScreen';
 import TopRatedMoviesScreen from './screens/TopRatedMoviesScreen';
 import TopRatedShowsScreen from './screens/TopRatedShowsScreen';
 import MoviesShowsByGenre from './screens/MoviesShowsByGenre';
+import DownloadsScreen from './screens/DownloadsScreen';
+import {WebFetchHost} from './stream/webFetch';
+import {DownloadHost} from './stream/DownloadHost';
+import {ensureStreamServer} from './stream/server';
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -149,6 +153,21 @@ const Main = () => {
           component={SearchScreen}
         />
         <Drawer.Screen
+          name="Downloads"
+          options={{
+            title: 'Downloads',
+            drawerLabel: 'Downloads',
+            drawerIcon: () => (
+              <IconButton
+                icon="download"
+                size={20}
+                style={{padding: 0, margin: 0}}
+              />
+            ),
+          }}
+          component={DownloadsScreen}
+        />
+        <Drawer.Screen
           name="Updates"
           options={{
             title: 'Updates',
@@ -192,6 +211,12 @@ const App = () => {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
 
+  React.useEffect(() => {
+    ensureStreamServer().catch(e => {
+      console.log('stream server failed to start', e);
+    });
+  }, []);
+
   return (
     <NavigationContainer theme={theme}>
       <RootStack.Navigator
@@ -201,6 +226,8 @@ const App = () => {
         <RootStack.Screen name="Main" component={Main} />
         <RootStack.Screen name="VideoPlayer" component={VideoPlayer} />
       </RootStack.Navigator>
+      <WebFetchHost />
+      <DownloadHost />
     </NavigationContainer>
   );
 };

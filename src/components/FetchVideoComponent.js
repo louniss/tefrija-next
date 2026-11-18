@@ -175,7 +175,14 @@ export const FetchVideoComponent = ({
         }
         doneRef.current = true;
         console.log('m3u8 found', data.url);
-        onDoneRef.current(data.url);
+        // The CDN only answers requests that come from the provider's own
+        // pages, so the player page (and the document the flow ran in) travel
+        // with the url and become the context the chunks are fetched from.
+        onDoneRef.current({
+          url: data.url,
+          playerUrl: data.playerUrl || '',
+          docOrigin: data.docOrigin || '',
+        });
         break;
       }
 

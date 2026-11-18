@@ -97,6 +97,19 @@ export async function refreshFlow(currentVersion) {
 }
 
 /**
+ * Forgets the cached flow so the next `getFlow()` downloads a new one. Used
+ * when a resolved url turns out to be unusable: the flow itself may be stale.
+ */
+export async function invalidateFlow() {
+  memoryFlow = null;
+  try {
+    await AsyncStorage.removeItem(STORAGE_KEY);
+  } catch (e) {
+    console.log('could not clear cached resolve flow', e);
+  }
+}
+
+/**
  * The flow to use now: the cached copy when there is one, otherwise a fresh
  * download, otherwise the copy bundled with the app. Does not throw: a player
  * that cannot reach the worker still gets a working resolver.

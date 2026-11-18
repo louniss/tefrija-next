@@ -12,6 +12,27 @@ import {
 import { moviedb } from '../movieDb';
 
 import useMainState from '../state/Main';
+import useStreamStore, { streamKey } from '../stream/store';
+
+const downloadEpisode = ({ serie, seasonNumber, episodeNumber, stillPath }) => {
+  useStreamStore.getState().queueDownload({
+    key: streamKey({
+      type: 'tv',
+      id: serie.id,
+      season: seasonNumber,
+      episode: episodeNumber,
+    }),
+    id: serie.id,
+    type: 'tv',
+    season: seasonNumber,
+    episode: episodeNumber,
+    title: serie.title,
+    poster: stillPath
+      ? `https://image.tmdb.org/t/p/w200/${stillPath}`
+      : serie.image,
+    year: serie.year,
+  });
+};
 
 const SerieDetails = ({ navigation, route }) => {
   const { serie } = route.params;
@@ -68,6 +89,14 @@ const SerieDetails = ({ navigation, route }) => {
 
   const EpisodeItem = ({ episode, s, navigation }) => {
     const state = useMainState();
+    const downloads = useStreamStore(store => store.downloads);
+    const key = streamKey({
+      type: 'tv',
+      id: s.id,
+      season: episode.season_number,
+      episode: episode.episode_number,
+    });
+    const download = downloads[key];
 
     return (
       <TouchableOpacity
@@ -109,7 +138,23 @@ const SerieDetails = ({ navigation, route }) => {
             style={{ width: 100, height: 100, borderRadius: 10 }}
           />
           <Caption style={{ padding: 10 }}>{episode.episode_number}</Caption>
-          <Caption style={{ padding: 10 }}>{episode.name}</Caption>
+          <Caption style={{ padding: 10, flex: 1 }}>{episode.name}</Caption>
+          <IconButton
+            icon={
+              download && download.status === 'completed'
+                ? 'check-circle'
+                : 'download'
+            }
+            size={20}
+            onPress={() =>
+              downloadEpisode({
+                serie: s,
+                seasonNumber: episode.season_number,
+                episodeNumber: episode.episode_number,
+                stillPath: episode.still_path,
+              })
+            }
+          />
         </View>
         <Divider />
       </TouchableOpacity>
@@ -151,6 +196,23 @@ const SerieDetails = ({ navigation, route }) => {
           {continueWatching.episode}
         </Button>
       ) : null}
+      <Button
+        style={{ marginHorizontal: 10 }}
+        mode="outlined"
+        icon="download"
+        disabled={!episodes.length}
+        onPress={() => {
+          episodes.forEach(item =>
+            downloadEpisode({
+              serie,
+              seasonNumber: item.season_number,
+              episodeNumber: item.episode_number,
+              stillPath: item.still_path,
+            }),
+          );
+        }}>
+        Download season {season}
+      </Button>
       <Menu
         visible={menuVisible}
         onDismiss={() => {

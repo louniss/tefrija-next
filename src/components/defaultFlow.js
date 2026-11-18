@@ -80,6 +80,7 @@ const FLOW_SCRIPT = `
 
   var stage = 'landing';
   var sent = false;
+  var playerPageUrl = '';
   /* Set from the player page CONFIG; forwarded to /generate.php. */
   var apiToken = '';
   var tokenStatus = null;
@@ -95,7 +96,21 @@ const FLOW_SCRIPT = `
     sent = true;
     clearTimeout(watchdog);
     setRetryCount(0);
-    post('m3u8', {url: url, tokened: true});
+
+    post('m3u8', {
+      url: url,
+      tokened: true,
+      docOrigin: location.origin,
+      playerUrl: playerPageUrl
+        ? (function () {
+            try {
+              return new URL(playerPageUrl, location.href).toString();
+            } catch (e) {
+              return playerPageUrl;
+            }
+          })()
+        : '',
+    });
   }
 
   function fail(message) {
@@ -301,6 +316,7 @@ const FLOW_SCRIPT = `
       'CFG.playerUrl',
     )
       .then(function (playerUrl) {
+        playerPageUrl = playerUrl;
         progress('player-page');
         return fetch(playerUrl, {credentials: 'omit', cache: 'no-store'});
       })
@@ -379,6 +395,6 @@ const FLOW_SCRIPT = `
 `;
 
 export const DEFAULT_FLOW = {
-  version: '1a00eae5-2e12',
+  version: '141c01ff-2f7f',
   script: FLOW_SCRIPT,
 };
