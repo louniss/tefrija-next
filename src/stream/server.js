@@ -90,11 +90,15 @@ const handle = async request => {
 
   // /s/<key>/<variant>/playlist.m3u8
   if (parts[3] === 'playlist.m3u8') {
+    const missing = new Set(variant.missing || []);
     return textResponse(
-      buildGhostMediaPlaylist(variant, index =>
-        index < 0
-          ? `${path.slice(0, path.lastIndexOf('/'))}/map.ts`
-          : `http://127.0.0.1:${listeningPort}/s/${key}/${variantIndex}/${index}.ts`,
+      buildGhostMediaPlaylist(
+        variant,
+        index =>
+          index < 0
+            ? `${path.slice(0, path.lastIndexOf('/'))}/map.ts`
+            : `http://127.0.0.1:${listeningPort}/s/${key}/${variantIndex}/${index}.ts`,
+        missing,
       ),
     );
   }

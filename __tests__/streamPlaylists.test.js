@@ -113,6 +113,21 @@ describe('media playlists', () => {
     expect(ghost).toContain('#EXT-X-ENDLIST');
   });
 
+  it('leaves out unavailable chunks and marks the gap', () => {
+    const playlist = parseMediaPlaylist(media, 'https://h.com/a/hi.m3u8');
+    const ghost = buildGhostMediaPlaylist(
+      playlist,
+      index => `http://127.0.0.1:9000/${index}.ts`,
+      new Set([0]),
+    );
+    expect(ghost).not.toContain('http://127.0.0.1:9000/0.ts');
+    expect(ghost).toContain('http://127.0.0.1:9000/1.ts');
+    expect(ghost).toContain('#EXT-X-DISCONTINUITY');
+    expect(ghost.indexOf('#EXT-X-DISCONTINUITY')).toBeLessThan(
+      ghost.indexOf('http://127.0.0.1:9000/1.ts'),
+    );
+  });
+
   it('builds a master playlist pointing at local qualities', () => {
     const variants = parseMasterPlaylist(master, 'https://h.com/a/master.m3u8');
     const ghost = buildGhostMasterPlaylist(variants, i => `local-${i}.m3u8`);

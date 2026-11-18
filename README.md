@@ -151,9 +151,24 @@ Flow of a playback:
 
 Downloads ([DownloadsScreen.js](./src/screens/DownloadsScreen.js), plus buttons
 on the movie/episode screens) reuse the same machinery: an item is resolved,
-then its chunks are fetched one by one and progress is kept in the store, so
-navigating away (or restarting) neither loses nor restarts the download.
-Removing a download from the list cancels it.
+then its chunks are fetched three at a time. Progress is kept in the store and
+counted from what is already on disk, so navigating away (or restarting) resumes
+a download instead of restarting it. Removing a download from the list cancels
+it.
+
+Chunks are stored per quality under a name derived from the *resolution*
+(`tefrija-streams/<key>/1920x800/…`), because the provider reorders qualities and
+reports a different bandwidth on every resolve.
+
+Two failure modes are handled differently:
+
+- a chunk that fails with 403/429/5xx (or a dead connection) is retried with
+  backoff, and the item is resolved once more in case the playlist token went
+  stale — download continues from the cached chunks;
+- a chunk that answers 404 is gone for good: it is parked, the rest of the
+  download carries on, and the finished item records it as missing. The ghost
+  playlist then leaves that chunk out and marks the gap with
+  `#EXT-X-DISCONTINUITY`, so playback jumps over it instead of failing.
 
 Subtitles are cached the same way: the search result list and the decoded
 subtitle text are stored under `DocumentDirectoryPath/subtitles`, and a cached

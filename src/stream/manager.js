@@ -79,7 +79,10 @@ export const chunksComplete = async (record, variantIndex) => {
     return false;
   }
   const cached = await cachedIndices(record, variant);
-  return cached.size >= variant.segments.length;
+  return (
+    cached.size + (variant.missing ? variant.missing.length : 0) >=
+    variant.segments.length
+  );
 };
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -415,7 +418,7 @@ export const downloadStream = async (record, variantIndex) => {
         }
       } catch (e) {
         console.log('chunk parked', record.key, index, e.message);
-        failed.push(index);
+        failed.push({index, status: e.status});
       }
     }
   };
@@ -432,10 +435,17 @@ export const downloadStream = async (record, variantIndex) => {
   }
 
   if (failed.length) {
-    const sample = failed.slice(0, 3).join(', ');
-    throw new Error(
+    const indices = failed.map(item => item.index);
+    const sample = indices.slice(0, 3).join(', ');
+    const error = new Error(
       `${failed.length} chunk${failed.length === 1 ? '' : 's'} unavailable (${sample})`,
     );
+    // The caller decides whether to retry or to play around the gap: a 404 is
+    // the file itself being absent (a retry changes nothing), anything else is
+    // probably about the token and worth one fresh resolve.
+    error.missing = indices;
+    error.retryable = failed.some(item => item.status !== 404);
+    throw error;
   }
 
   store.setDownload(record.key, {status: 'completed', done: total, total});
@@ -445,6 +455,24 @@ export const downloadStream = async (record, variantIndex) => {
     downloadedAt: Date.now(),
   });
   return {done, total};
+};
+
+/**
+ * Accepts a quality with permanent holes: the chunks are remembered so the
+ * ghost playlist leaves them out instead of making the whole item unplayable.
+ */
+export const acceptMissingChunks = (record, variantIndex, indices) => {
+  const variants = record.variants.map((variant, index) => {
+    if (index !== variantIndex) {
+      return variant;
+    }
+    const missing = new Set(variant.missing || []);
+    indices.forEach(chunk => missing.add(chunk));
+    return {...variant, missing: [...missing].sort((a, b) => a - b)};
+  });
+  const updated = {...record, variants, downloadedVariant: variantIndex};
+  useStreamStore.getState().setStream(updated);
+  return updated;
 };
 
 /** Local URL of one quality's ghost playlist. */

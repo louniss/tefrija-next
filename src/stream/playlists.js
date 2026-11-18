@@ -180,8 +180,14 @@ export const parseMediaPlaylist = (text, baseUrl) => {
 
 const tagDuration = (value) => (Math.round(value * 1000) / 1000).toString();
 
-/** Rewrites a media playlist so every URI is produced by `mapUri`. */
-export const buildGhostMediaPlaylist = (playlist, mapUri) => {
+/**
+ * Rewrites a media playlist so every URI is produced by `mapUri`.
+ *
+ * `skip` drops chunks the CDN will not serve. A dropped chunk leaves a gap in
+ * the timeline, so it is announced with `#EXT-X-DISCONTINUITY` — the player then
+ * jumps over it instead of refusing to play the whole title.
+ */
+export const buildGhostMediaPlaylist = (playlist, mapUri, skip) => {
   const lines = ['#EXTM3U', '#EXT-X-VERSION:3'];
   lines.push(`#EXT-X-TARGETDURATION:${Math.ceil(playlist.targetDuration || 6)}`);
   lines.push('#EXT-X-MEDIA-SEQUENCE:0');
@@ -189,7 +195,16 @@ export const buildGhostMediaPlaylist = (playlist, mapUri) => {
     lines.push(`#EXT-X-MAP:URI="${mapUri(-1)}"`);
   }
   let lastKey = null;
+  let skipped = false;
   playlist.segments.forEach((segment, index) => {
+    if (skip && skip.has(index)) {
+      skipped = true;
+      return;
+    }
+    if (skipped) {
+      lines.push('#EXT-X-DISCONTINUITY');
+      skipped = false;
+    }
     if (segment.key) {
       const key = `${segment.key.method}:${segment.key.uri}`;
       if (key !== lastKey) {

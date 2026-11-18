@@ -22,7 +22,11 @@ const statusLabel = item => {
     case 'queued':
       return 'Queued';
     case 'completed':
-      return 'Downloaded — plays offline';
+      return item.skipped
+        ? `Downloaded — plays offline (${item.skipped} chunk${
+            item.skipped === 1 ? '' : 's'
+          } unavailable, skipped)`
+        : 'Downloaded — plays offline';
     case 'error':
       return `Failed: ${item.error || 'unknown error'}`;
     default:
@@ -78,7 +82,8 @@ const DownloadsScreen = ({navigation}) => {
             />
           </View>
           <View>
-            {item.status === 'error' ? (
+            {item.status === 'error' ||
+            (item.status === 'completed' && item.skipped) ? (
               <IconButton icon="refresh" size={20} onPress={() => resume(item)} />
             ) : null}
             <IconButton

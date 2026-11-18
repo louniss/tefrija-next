@@ -90,11 +90,13 @@ const useStreamStore = create(
       /** Schedules a download; the resolution happens later, on the host. */
       queueDownload(item) {
         const existing = get().downloads[item.key];
+        // A finished download is final, unless chunks had to be skipped: those
+        // are worth another try on a later day.
         if (
           existing &&
           (existing.status === 'downloading' ||
             existing.status === 'queued' ||
-            existing.status === 'completed')
+            (existing.status === 'completed' && !existing.skipped))
         ) {
           return;
         }
@@ -104,6 +106,7 @@ const useStreamStore = create(
           done: 0,
           total: 0,
           error: null,
+          skipped: 0,
         });
       },
     }),

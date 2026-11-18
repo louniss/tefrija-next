@@ -4,7 +4,11 @@ import {View} from 'react-native';
 
 import {FetchVideoComponent} from '../components/FetchVideoComponent';
 
-import {downloadStream, prepareStream} from './manager';
+import {
+  acceptMissingChunks,
+  downloadStream,
+  prepareStream,
+} from './manager';
 import useStreamStore from './store';
 
 const nextJobOf = downloads =>
@@ -59,10 +63,21 @@ export const DownloadHost = () => {
       // download continues from where it stopped.
       store.dropStream(item.key);
       const retries = retriesRef.current[item.key] || 0;
-      if (retries < 1) {
+      if (e.retryable && retries < 1) {
         retriesRef.current[item.key] = retries + 1;
         console.log('download will re-resolve and resume', item.key, e.message);
         store.setDownload(item.key, {status: 'downloading', error: null});
+        return;
+      }
+      if (e.missing && e.missing.length) {
+        // A chunk the CDN will never serve: keep the rest and play around it.
+        acceptMissingChunks(stream, stream.downloadedVariant ?? stream.defaultVariant, e.missing);
+        store.setDownload(item.key, {
+          status: 'completed',
+          error: null,
+          skipped: e.missing.length,
+        });
+        console.log('download completed with gaps', item.key, e.missing.length);
         return;
       }
       console.log('download failed', item.key, e.message);
