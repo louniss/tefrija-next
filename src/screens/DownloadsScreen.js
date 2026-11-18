@@ -1,15 +1,16 @@
-import React, {useMemo, useState} from 'react';
-import {FlatList, Image, View} from 'react-native';
+import React, {useCallback, useMemo, useState} from 'react';
+import {FlatList, Image, TouchableOpacity, View} from 'react-native';
 import {
   Button,
   Caption,
   Card,
   Dialog,
-  IconButton,
+  Icon,
   Portal,
   ProgressBar,
   Subheading,
   Text,
+  useTheme,
 } from 'react-native-paper';
 
 import useStreamStore, {sortDownloads} from '../stream/store';
@@ -42,6 +43,11 @@ const statusLabel = item => {
 const isRunning = item =>
   item.status === 'downloading' || item.status === 'queued';
 
+const episodeLabel = item =>
+  item.season != null && item.episode != null
+    ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`
+    : '';
+
 /**
  * Which rows belong together: a movie on its own, a series grouped so a whole
  * season reads as one list.
@@ -70,22 +76,183 @@ const buildGroups = items => {
     .map(group => ({
       ...group,
       episodes: group.episodes.sort(
-        (a, b) => (a.season || 0) - (b.season || 0) || (a.episode || 0) - (b.episode || 0),
+        (a, b) =>
+          (a.season || 0) - (b.season || 0) || (a.episode || 0) - (b.episode || 0),
       ),
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 };
 
-const episodeLabel = item =>
-  item.season != null && item.episode != null
-    ? `S${String(item.season).padStart(2, '0')}E${String(item.episode).padStart(2, '0')}`
-    : '';
+/**
+ * Small square touch target: the default `IconButton` reserves ~72dp each,
+ * which left no room for the episode title.
+ */
+const Action = ({icon, onPress, label, color}) => (
+  <TouchableOpacity
+    accessibilityLabel={label}
+    accessibilityRole="button"
+    onPress={onPress}
+    hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}
+    style={{
+      width: 34,
+      height: 34,
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+    <Icon source={icon} size={20} color={color} />
+  </TouchableOpacity>
+);
+
+const RowActions = ({item, onPlay, onPause, onResume, onDelete, theme}) => (
+  <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 6}}>
+    <Action icon="play" label="Play" onPress={onPlay} />
+    {isRunning(item) ? (
+      <Action icon="pause" label="Pause" onPress={onPause} />
+    ) : item.status === 'paused' || item.status === 'error' ? (
+      <Action
+        icon="play-circle-outline"
+        label="Resume"
+        onPress={onResume}
+        color={theme.colors.primary}
+      />
+    ) : null}
+    <Action icon="delete-outline" label="Delete" onPress={onDelete} />
+  </View>
+);
+
+const EpisodeRow = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
+  <View style={{flexDirection: 'row', alignItems: 'center', paddingVertical: 4}}>
+    {item.still ? (
+      <Image
+        source={{uri: item.still}}
+        style={{width: 56, height: 34, borderRadius: 4, marginRight: 8}}
+      />
+    ) : null}
+    <View style={{flex: 1}}>
+      <Text numberOfLines={1} style={{fontSize: 13}}>
+        {episodeLabel(item)} {item.episodeTitle || ''}
+      </Text>
+      <Caption numberOfLines={1} style={{fontSize: 11}}>
+        {statusLabel(item)}
+      </Caption>
+      <ProgressBar
+        progress={item.status === 'completed' ? 1 : percentOf(item) / 100}
+        color={item.status === 'error' ? theme.colors.error : undefined}
+        style={{height: 3, borderRadius: 2}}
+      />
+    </View>
+    <RowActions
+      item={item}
+      theme={theme}
+      onPlay={onPlay}
+      onPause={onPause}
+      onResume={onResume}
+      onDelete={onDelete}
+    />
+  </View>
+);
+
+const MovieCard = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
+  <Card style={{margin: 5}}>
+    <View style={{flexDirection: 'row', padding: 8}}>
+      {item.poster ? (
+        <Image
+          source={{uri: item.poster}}
+          style={{width: 60, height: 90, borderRadius: 6}}
+        />
+      ) : null}
+      <View style={{flex: 1, paddingLeft: 10, justifyContent: 'center'}}>
+        <Subheading numberOfLines={2}>{item.title || item.key}</Subheading>
+        {item.year ? <Caption>{item.year}</Caption> : null}
+        <Text style={{fontSize: 12, paddingBottom: 6}}>{statusLabel(item)}</Text>
+        <ProgressBar
+          progress={item.status === 'completed' ? 1 : percentOf(item) / 100}
+          color={item.status === 'error' ? theme.colors.error : undefined}
+          style={{height: 3, borderRadius: 2}}
+        />
+      </View>
+      <RowActions
+        item={item}
+        theme={theme}
+        onPlay={onPlay}
+        onPause={onPause}
+        onResume={onResume}
+        onDelete={onDelete}
+      />
+    </View>
+  </Card>
+);
+
+const SerieCard = ({
+  group,
+  isOpen,
+  theme,
+  onToggle,
+  onPlay,
+  onPause,
+  onResume,
+  onDelete,
+}) => {
+  const downloaded = group.episodes.filter(
+    item => item.status === 'completed',
+  ).length;
+  const overall = group.episodes.reduce(
+    (sum, item) =>
+      sum + (item.status === 'completed' ? 1 : percentOf(item) / 100),
+    0,
+  );
+
+  return (
+    <Card style={{margin: 5}}>
+      <TouchableOpacity
+        onPress={onToggle}
+        accessibilityRole="button"
+        style={{flexDirection: 'row', padding: 8, alignItems: 'center'}}>
+        {group.poster ? (
+          <Image
+            source={{uri: group.poster}}
+            style={{width: 48, height: 72, borderRadius: 6}}
+          />
+        ) : null}
+        <View style={{flex: 1, paddingLeft: 10}}>
+          <Subheading numberOfLines={2}>{group.title}</Subheading>
+          <Caption>
+            {downloaded} of {group.episodes.length} episode
+            {group.episodes.length === 1 ? '' : 's'} downloaded
+          </Caption>
+          <ProgressBar
+            progress={overall / group.episodes.length}
+            style={{height: 3, borderRadius: 2}}
+          />
+        </View>
+        <View style={{width: 34, alignItems: 'center'}}>
+          <Icon source={isOpen ? 'chevron-up' : 'chevron-down'} size={22} />
+        </View>
+      </TouchableOpacity>
+      {isOpen
+        ? group.episodes.map(item => (
+            <View key={item.key} style={{paddingHorizontal: 10, paddingBottom: 4}}>
+              <EpisodeRow
+                item={item}
+                theme={theme}
+                onPlay={() => onPlay(item)}
+                onPause={() => onPause(item)}
+                onResume={() => onResume(item)}
+                onDelete={() => onDelete(item)}
+              />
+            </View>
+          ))
+        : null}
+    </Card>
+  );
+};
 
 const DownloadsScreen = ({navigation}) => {
   const downloads = useStreamStore(state => state.downloads);
   const removeStream = useStreamStore(state => state.removeStream);
   const pauseDownload = useStreamStore(state => state.pauseDownload);
   const resumeDownload = useStreamStore(state => state.resumeDownload);
+  const theme = useTheme();
   const [expanded, setExpanded] = useState({});
   const [confirming, setConfirming] = useState(null);
 
@@ -94,16 +261,26 @@ const DownloadsScreen = ({navigation}) => {
     [downloads],
   );
 
-  const play = item => {
-    const parent = navigation && navigation.getParent();
-    const target = parent || navigation;
-    target.navigate('VideoPlayer', {
-      type: item.type,
-      id: item.id,
-      season: item.season,
-      episode: item.episode,
-    });
-  };
+  const play = useCallback(
+    item => {
+      const parent = navigation && navigation.getParent();
+      (parent || navigation).navigate('VideoPlayer', {
+        type: item.type,
+        id: item.id,
+        season: item.season,
+        episode: item.episode,
+      });
+    },
+    [navigation],
+  );
+
+  const pause = useCallback(key => pauseDownload(key), [pauseDownload]);
+  const resume = useCallback(key => resumeDownload(key), [resumeDownload]);
+  const confirmDelete = useCallback(item => setConfirming(item), []);
+  const toggle = useCallback(
+    id => setExpanded(current => ({...current, [id]: !current[id]})),
+    [],
+  );
 
   const remove = async item => {
     removeStream(item.key);
@@ -114,141 +291,27 @@ const DownloadsScreen = ({navigation}) => {
     }
   };
 
-  const EpisodeRow = ({item}) => (
-    <View style={{flexDirection: 'row', alignItems: 'center', paddingVertical: 6}}>
-      {item.still ? (
-        <Image
-          source={{uri: item.still}}
-          style={{width: 64, height: 40, borderRadius: 4, marginRight: 10}}
-        />
-      ) : null}
-      <View style={{flex: 1}}>
-        <Text numberOfLines={1}>
-          {episodeLabel(item)} {item.episodeTitle || ''}
-        </Text>
-        <Caption>{statusLabel(item)}</Caption>
-        <ProgressBar
-          progress={item.status === 'completed' ? 1 : percentOf(item) / 100}
-          color={item.status === 'error' ? 'red' : undefined}
-        />
-      </View>
-      <IconButton icon="play" size={20} onPress={() => play(item)} />
-      {isRunning(item) ? (
-        <IconButton
-          icon="pause"
-          size={20}
-          onPress={() => pauseDownload(item.key)}
-        />
-      ) : item.status === 'paused' || item.status === 'error' ? (
-        <IconButton
-          icon="play-circle-outline"
-          size={20}
-          onPress={() => resumeDownload(item.key)}
-        />
-      ) : null}
-      <IconButton
-        icon="delete"
-        size={20}
-        onPress={() => setConfirming(item)}
-      />
-    </View>
-  );
-
-  const MovieCard = ({item}) => (
-    <Card style={{margin: 5}}>
-      <View style={{flexDirection: 'row', padding: 8}}>
-        {item.poster ? (
-          <Image
-            source={{uri: item.poster}}
-            style={{width: 70, height: 105, borderRadius: 6}}
-          />
-        ) : null}
-        <View style={{flex: 1, paddingLeft: 10}}>
-          <Subheading numberOfLines={2}>{item.title || item.key}</Subheading>
-          {item.year ? <Caption>{item.year}</Caption> : null}
-          <Text style={{fontSize: 12, paddingBottom: 6}}>
-            {statusLabel(item)}
-          </Text>
-          <ProgressBar
-            progress={item.status === 'completed' ? 1 : percentOf(item) / 100}
-            color={item.status === 'error' ? 'red' : undefined}
-          />
-        </View>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <IconButton icon="play" size={20} onPress={() => play(item)} />
-          {isRunning(item) ? (
-            <IconButton
-              icon="pause"
-              size={20}
-              onPress={() => pauseDownload(item.key)}
-            />
-          ) : item.status === 'paused' || item.status === 'error' ? (
-            <IconButton
-              icon="play-circle-outline"
-              size={20}
-              onPress={() => resumeDownload(item.key)}
-            />
-          ) : null}
-          <IconButton
-            icon="delete"
-            size={20}
-            onPress={() => setConfirming(item)}
-          />
-        </View>
-      </View>
-    </Card>
-  );
-
-  const SerieCard = ({group}) => {
-    const isOpen = !!expanded[group.id];
-    const downloaded = group.episodes.filter(
-      item => item.status === 'completed',
-    ).length;
-    const overall = group.episodes.reduce(
-      (sum, item) => sum + (item.status === 'completed' ? 1 : percentOf(item) / 100),
-      0,
-    );
-    return (
-      <Card style={{margin: 5}}>
-        <View style={{flexDirection: 'row', padding: 8, alignItems: 'center'}}>
-          {group.poster ? (
-            <Image
-              source={{uri: group.poster}}
-              style={{width: 55, height: 82, borderRadius: 6}}
-            />
-          ) : null}
-          <View style={{flex: 1, paddingLeft: 10}}>
-            <Subheading numberOfLines={2}>{group.title}</Subheading>
-            <Caption>
-              {downloaded} of {group.episodes.length} episode
-              {group.episodes.length === 1 ? '' : 's'} downloaded
-            </Caption>
-            <ProgressBar progress={overall / group.episodes.length} />
-          </View>
-          <IconButton
-            icon={isOpen ? 'chevron-up' : 'chevron-down'}
-            size={22}
-            onPress={() =>
-              setExpanded(current => ({...current, [group.id]: !isOpen}))
-            }
-          />
-        </View>
-        {isOpen ? (
-          <View style={{paddingHorizontal: 10, paddingBottom: 6}}>
-            {group.episodes.map(item => (
-              <EpisodeRow key={item.key} item={item} />
-            ))}
-          </View>
-        ) : null}
-      </Card>
-    );
-  };
-
   const renderGroup = ({item}) =>
     item.type === 'tv' ? (
-      <SerieCard group={item} />
+      <SerieCard
+        group={item}
+        isOpen={!!expanded[item.id]}
+        theme={theme}
+        onToggle={() => toggle(item.id)}
+        onPlay={play}
+        onPause={pause}
+        onResume={resume}
+        onDelete={confirmDelete}
+      />
     ) : (
-      <MovieCard item={item.episodes[0]} />
+      <MovieCard
+        item={item.episodes[0]}
+        theme={theme}
+        onPlay={() => play(item.episodes[0])}
+        onPause={() => pause(item.episodes[0].key)}
+        onResume={() => resume(item.episodes[0].key)}
+        onDelete={() => confirmDelete(item.episodes[0])}
+      />
     );
 
   return (
@@ -257,6 +320,7 @@ const DownloadsScreen = ({navigation}) => {
         data={groups}
         keyExtractor={item => item.id}
         renderItem={renderGroup}
+        extraData={expanded}
         ListEmptyComponent={
           <View style={{padding: 20}}>
             <Caption>
@@ -277,9 +341,7 @@ const DownloadsScreen = ({navigation}) => {
         }
       />
       <Portal>
-        <Dialog
-          visible={!!confirming}
-          onDismiss={() => setConfirming(null)}>
+        <Dialog visible={!!confirming} onDismiss={() => setConfirming(null)}>
           <Dialog.Title>Delete download?</Dialog.Title>
           <Dialog.Content>
             <Text>

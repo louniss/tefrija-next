@@ -48,6 +48,73 @@ export const clearStreamFiles = async key => {
 export const segmentExists = (key, variant, index) =>
   RNFS.exists(segmentPath(key, variant, index));
 
+/* ---- stream records ----------------------------------------------------
+ * A record lists every chunk url of every quality: hundreds of kilobytes for a
+ * single movie. AsyncStorage silently refuses rows that big (and the whole
+ * download list then stops being saved), so records live next to their chunks
+ * in `tefrija-streams/<key>/record.json` and only the download list is kept in
+ * AsyncStorage.
+ */
+const recordPath = key => `${keyToDir(key)}/record.json`;
+const recordCache = new Map();
+
+export const saveRecord = async record => {
+  recordCache.set(record.key, record);
+  try {
+    await ensureDir(keyToDir(record.key));
+    await RNFS.writeFile(recordPath(record.key), JSON.stringify(record), 'utf8');
+  } catch (e) {
+    console.log('could not store stream record', record.key, e.message);
+  }
+};
+
+export const loadRecord = async key => {
+  if (recordCache.has(key)) {
+    return recordCache.get(key);
+  }
+  try {
+    if (!(await RNFS.exists(recordPath(key)))) {
+      return null;
+    }
+    const record = JSON.parse(await RNFS.readFile(recordPath(key), 'utf8'));
+    recordCache.set(key, record);
+    return record;
+  } catch (e) {
+    console.log('could not read stream record', key, e.message);
+    return null;
+  }
+};
+
+export const deleteRecord = async key => {
+  recordCache.delete(key);
+  try {
+    if (await RNFS.exists(recordPath(key))) {
+      await RNFS.unlink(recordPath(key));
+    }
+  } catch (e) {
+    console.log('could not delete stream record', key, e.message);
+  }
+};
+
+/** Puts the records of the given downloads back into the store after a start. */
+export const hydrateRecords = async keys => {
+  for (const key of keys) {
+    if (useStreamStore.getState().streams[key]) {
+      continue;
+    }
+    const record = await loadRecord(key);
+    if (record) {
+      useStreamStore.getState().setStream(record);
+    }
+  }
+};
+
+/** Forgets a resolved stream, in memory and on disk. */
+export const forgetStream = async key => {
+  useStreamStore.getState().dropStream(key);
+  await deleteRecord(key);
+};
+
 /** Indices already on disk for one quality. */
 export const cachedIndices = async (record, variant) => {
   try {
@@ -331,7 +398,8 @@ export const prepareStream = async ({
     poster: poster || '',
     year: year || '',
   };
-  const cached = useStreamStore.getState().streams[media.key];
+  const cached =
+    useStreamStore.getState().streams[media.key] || (await loadRecord(media.key));
   if (cached) {
     const variant = cached.downloadedVariant ?? cached.defaultVariant;
     if (await chunksComplete(cached, variant)) {
@@ -357,6 +425,7 @@ export const prepareStream = async ({
     record.variants[record.defaultVariant].segments.length,
   );
   useStreamStore.getState().setStream(record);
+  await saveRecord(record);
   return record;
 };
 
@@ -455,11 +524,13 @@ export const downloadStream = async (record, variantIndex) => {
   }
 
   store.setDownload(record.key, {status: 'completed', done: total, total});
-  store.setStream({
+  const finished = {
     ...record,
     downloadedVariant: variantIndex,
     downloadedAt: Date.now(),
-  });
+  };
+  store.setStream(finished);
+  await saveRecord(finished);
   return {done, total};
 };
 
@@ -467,7 +538,7 @@ export const downloadStream = async (record, variantIndex) => {
  * Accepts a quality with permanent holes: the chunks are remembered so the
  * ghost playlist leaves them out instead of making the whole item unplayable.
  */
-export const acceptMissingChunks = (record, variantIndex, indices) => {
+export const acceptMissingChunks = async (record, variantIndex, indices) => {
   const variants = record.variants.map((variant, index) => {
     if (index !== variantIndex) {
       return variant;
@@ -478,6 +549,7 @@ export const acceptMissingChunks = (record, variantIndex, indices) => {
   });
   const updated = {...record, variants, downloadedVariant: variantIndex};
   useStreamStore.getState().setStream(updated);
+  await saveRecord(updated);
   return updated;
 };
 

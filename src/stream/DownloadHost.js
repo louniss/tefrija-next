@@ -7,6 +7,8 @@ import {FetchVideoComponent} from '../components/FetchVideoComponent';
 import {
   acceptMissingChunks,
   downloadStream,
+  forgetStream,
+  hydrateRecords,
   prepareStream,
 } from './manager';
 import useStreamStore from './store';
@@ -42,6 +44,16 @@ export const DownloadHost = () => {
    * automatic re-resolve resumes it from the chunks already on disk. */
   const retriesRef = useRef({});
 
+  // After a restart the records are on disk, not in the store.
+  useEffect(() => {
+    const keys = Object.values(useStreamStore.getState().downloads).map(
+      item => item.key,
+    );
+    if (keys.length) {
+      hydrateRecords(keys);
+    }
+  }, [downloads]);
+
   const jobs = useMemo(() => activeJobsOf(downloads), [downloads]);
   // One item at a time is resolved (a single hidden WebView drives the flow);
   // everything already resolved downloads in parallel.
@@ -66,21 +78,24 @@ export const DownloadHost = () => {
       if (/cancelled/.test(e.message || '')) {
         return;
       }
-      // The stored playlists are what failed (dead token or dead context):
-      // dropping them makes the next attempt resolve the item from scratch
-      // instead of repeating the same failure. Cached chunks are kept, so the
-      // download continues from where it stopped.
-      store.dropStream(item.key);
       const retries = retriesRef.current[item.key] || 0;
+      // The stored playlists are what failed (dead token or dead context), so
+      // the next attempt resolves the item from scratch. Cached chunks are
+      // kept, so it continues where it stopped instead of restarting.
       if (e.retryable && retries < 1) {
         retriesRef.current[item.key] = retries + 1;
         console.log('download will re-resolve and resume', item.key, e.message);
+        await forgetStream(item.key);
         store.setDownload(item.key, {status: 'downloading', error: null});
         return;
       }
       if (e.missing && e.missing.length) {
         // A chunk the CDN will never serve: keep the rest and play around it.
-        acceptMissingChunks(stream, stream.downloadedVariant ?? stream.defaultVariant, e.missing);
+        await acceptMissingChunks(
+          stream,
+          stream.downloadedVariant ?? stream.defaultVariant,
+          e.missing,
+        );
         store.setDownload(item.key, {
           status: 'completed',
           error: null,
@@ -90,6 +105,7 @@ export const DownloadHost = () => {
         return;
       }
       console.log('download failed', item.key, e.message);
+      await forgetStream(item.key);
       store.setDownload(item.key, {status: 'error', error: e.message});
     }
   }, []);
@@ -126,7 +142,7 @@ export const DownloadHost = () => {
     } catch (e) {
       console.log('download preparation failed', item.key, e.message);
       const store = useStreamStore.getState();
-      store.dropStream(item.key);
+      await forgetStream(item.key);
       store.setDownload(item.key, {status: 'error', error: e.message});
     }
   }, []);

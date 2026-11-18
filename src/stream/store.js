@@ -136,7 +136,9 @@ const useStreamStore = create(
     {
       name: 'tefrijaStreams',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: state => ({streams: state.streams, downloads: state.downloads}),
+      // Stream records are far too big for AsyncStorage rows: they live on disk
+      // (see manager.saveRecord). Only the download list is persisted here.
+      partialize: state => ({downloads: state.downloads}),
       onRehydrateStorage: () => state => {
         if (state) {
           state.markHydrated();

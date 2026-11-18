@@ -8,7 +8,7 @@ import {
   buildGhostMasterPlaylist,
   buildGhostMediaPlaylist,
 } from './playlists';
-import {ensureSegment, segmentPath} from './manager';
+import {ensureSegment, loadRecord, segmentPath} from './manager';
 
 /**
  * Local HTTP server the video player talks to.
@@ -67,7 +67,8 @@ const handle = async request => {
   }
 
   const key = decodeURIComponent(parts[1]);
-  const record = useStreamStore.getState().streams[key];
+  const record =
+    useStreamStore.getState().streams[key] || (await loadRecord(key));
   if (!record) {
     return notFound(`unknown stream ${key}`);
   }

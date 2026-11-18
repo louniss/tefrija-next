@@ -9,7 +9,12 @@ import {FetchVideoComponent} from '../../components/FetchVideoComponent';
 import SubtitleReader from '../../SubtitleReader';
 import SubtitleManager from '../../SubtitleManager';
 import {ensureStreamServer} from '../../stream/server';
-import {chunksComplete, localVariantUrl, prepareStream} from '../../stream/manager';
+import {
+  chunksComplete,
+  loadRecord,
+  localVariantUrl,
+  prepareStream,
+} from '../../stream/manager';
 import useStreamStore, {streamKey} from '../../stream/store';
 import {invalidateFlow} from '../../components/resolveFlow';
 
@@ -128,17 +133,23 @@ const VideoPlayerScreen = ({route}) => {
   const [offlineRecord, setOfflineRecord] = useState(null);
   useEffect(() => {
     let cancelled = false;
-    const stored = useStreamStore.getState().streams[mediaKey];
-    if (!stored) {
-      setOfflineRecord(null);
-      return;
-    }
-    const variant = stored.downloadedVariant ?? stored.defaultVariant;
-    chunksComplete(stored, variant).then(complete => {
+    (async () => {
+      const stored =
+        useStreamStore.getState().streams[mediaKey] ||
+        (await loadRecord(mediaKey));
+      if (cancelled) {
+        return;
+      }
+      if (!stored) {
+        setOfflineRecord(null);
+        return;
+      }
+      const variant = stored.downloadedVariant ?? stored.defaultVariant;
+      const complete = await chunksComplete(stored, variant);
       if (!cancelled) {
         setOfflineRecord(complete ? stored : null);
       }
-    });
+    })();
     return () => {
       cancelled = true;
     };
