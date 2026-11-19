@@ -5,61 +5,52 @@ import {
   useColorScheme,
   Animated,
   TouchableWithoutFeedback,
-  Dimensions,
+  useWindowDimensions,
   Pressable,
   ScrollView,
+  FlatList,
+  Image,
+  TouchableOpacity,
 } from 'react-native';
 import {
-  ActivityIndicator,
-  Button,
-  Caption,
-  Chip,
-  Dialog,
-  Headline,
   IconButton,
-  List,
-  Modal,
-  Paragraph,
-  Portal,
   Text,
+  Portal,
+  Divider,
+  Icon,
 } from 'react-native-paper';
-import {Menu, Divider} from 'react-native-paper';
 import Slider from '@react-native-community/slider';
-
 import WebView from 'react-native-webview';
 import {moviedb} from '../../movieDb';
 import {useNavigation} from '@react-navigation/native';
 import SubtitleManager from '../../SubtitleManager';
-
 import useMainState from '../../state/Main';
-import delay from 'delay';
-
-const {width} = Dimensions.get('window');
+import useResponsive from '../../utils/useResponsive';
 
 const subtitleManager = new SubtitleManager();
 
 const ExtraControls = ({
   isPlaying,
   setIsPlaying,
-  playerQualities,
+  playerQualities = [],
   setUri,
   playerError,
   setSubtitleIsVisible,
   setSelectedLang,
-  subtitleDelay,
+  subtitleDelay = 0,
   setSubtitleDelay,
   videoRef,
 
-  duration,
-  currentTime,
+  duration = 0,
+  currentTime = 0,
   setCurrentTime,
-  liveCurrentTime,
+  liveCurrentTime = 0,
 
   subtitleText,
   subtitleIsVisible,
   isRtl,
 
-  subtitleNumber,
+  subtitleNumber = 0,
   setSubtitleNumber,
 
   id,
@@ -69,42 +60,60 @@ const ExtraControls = ({
 
   resizeMode,
   setResizeMode,
+  volume = 1,
+  setVolume,
+  playbackRate = 1.0,
+  setPlaybackRate,
 }) => {
-  const [visible, setVisible] = useState(false);
-  const [subtitleModalVisible, setSubtitleModalVisible] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(true);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
+  const {width, height} = useWindowDimensions();
+  const {isTablet} = useResponsive();
+  const navigation = useNavigation();
+  const state = useMainState();
   const colorScheme = useColorScheme();
 
-  const openMenu = () => setVisible(true);
-  const closeMenu = () => setVisible(false);
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
-  const openSubtitleModal = () => setSubtitleModalVisible(true);
-  const closeSubtitleModal = () => setSubtitleModalVisible(false);
+  // Modals / Panels
+  const [showAudioSubModal, setShowAudioSubModal] = useState(false);
+  const [showEpisodesPanel, setShowEpisodesPanel] = useState(false);
+  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [seasonDropdownVisible, setSeasonDropdownVisible] = useState(false);
 
-  const [adsVisible, setAdsVisible] = useState(false);
-  const [canCloseAds, setCanCloseAds] = useState(false);
-
-  const navigation = useNavigation();
-
-  const langs = [
-    {lang: 'Arabic', code: 'ara'},
-    {lang: 'French', code: 'fre'},
-    {lang: 'English', code: 'eng'},
-  ];
-
-  const [currentLang, setCurrentLang] = useState('Arabic');
+  // TV data
   const [mediaTitle, setMediaTitle] = useState('');
+  const [episodeTitle, setEpisodeTitle] = useState('');
+  const [seasonEpisodes, setSeasonEpisodes] = useState([]);
+  const [totalSeasons, setTotalSeasons] = useState(1);
+  const [selectedSeason, setSelectedSeason] = useState(season || 1);
 
+  useEffect(() => {
+    if (season) {
+      setSelectedSeason(season);
+    }
+  }, [season]);
+
+  // Lock state
   const [isLocked, setIsLocked] = useState(false);
   const unlockButtonAnim = useRef(new Animated.Value(0)).current;
 
-  const state = useMainState();
-
+  // Ads
   const [adUrl, setAdUrl] = useState('');
 
-  const resizeModes = ['cover', 'contain', 'stretch', 'none'];
+  // Resize mode
+  const resizeModes = ['cover', 'contain', 'stretch'];
   const [resizeIndex, setResizeIndex] = useState(0);
+
+  // Subtitle langs
+  const langs = [
+    {lang: 'Arabic', code: 'ara'},
+    {lang: 'English', code: 'eng'},
+    {lang: 'French', code: 'fre'},
+  ];
+  const [currentLang, setCurrentLang] = useState('Arabic');
+
+  // Speeds
+  const speeds = [0.75, 1.0, 1.25, 1.5, 2.0];
 
   useEffect(() => {
     setTimeout(
@@ -115,6 +124,54 @@ const ExtraControls = ({
       5000,
     );
   }, []);
+
+  // Fetch Media and Episode title
+  useEffect(() => {
+    async function fetchInfo() {
+      try {
+        if (type === 'movie') {
+          const res = await moviedb.movieInfo({id});
+          setMediaTitle(res.title || '');
+        } else {
+          const res = await moviedb.tvInfo({id});
+          setMediaTitle(res.name || '');
+          setTotalSeasons(res.number_of_seasons || res.seasons?.length || 1);
+
+          if (season && episode) {
+            const ep = await moviedb.episodeInfo({
+              id,
+              season_number: season,
+              episode_number: episode,
+            });
+            setEpisodeTitle(ep.name || '');
+          }
+        }
+      } catch (e) {
+        console.warn('fetchInfo error in player', e);
+      }
+    }
+    fetchInfo();
+  }, [id, type, season, episode]);
+
+  // Fetch season episodes for episodes panel
+  useEffect(() => {
+    if (type === 'tv' && id && selectedSeason) {
+      moviedb
+        .seasonInfo({
+          id,
+          season_number: selectedSeason,
+          append_to_response: 'episodes',
+        })
+        .then(res => {
+          setSeasonEpisodes(res.episodes || []);
+        })
+        .catch(() => setSeasonEpisodes([]));
+    }
+  }, [id, selectedSeason, type]);
+
+  useEffect(() => {
+    if (season) setSelectedSeason(season);
+  }, [season]);
 
   const showUnlockButton = () => {
     Animated.timing(unlockButtonAnim, {
@@ -128,61 +185,54 @@ const ExtraControls = ({
           duration: 300,
           useNativeDriver: true,
         }).start();
-      }, 1000);
+      }, 1500);
     });
   };
 
   const handleLockPress = () => {
-    toggleControls();
+    console.log('HANDLE LOCK PRESS TRIGGERED');
+    setControlsVisible(false);
+    Animated.timing(fadeAnim, {toValue: 0, duration: 250, useNativeDriver: true}).start();
     setIsLocked(true);
     showUnlockButton();
   };
 
   const handleUnlockPress = () => {
     setIsLocked(false);
-    toggleControls();
+    setControlsVisible(true);
+    Animated.timing(fadeAnim, {toValue: 1, duration: 250, useNativeDriver: true}).start();
   };
 
-  useEffect(() => {
-    async function fetchMediaTitle() {
-      let response;
-      if (type === 'movie') {
-        response = await moviedb.movieInfo({id: id});
-        setMediaTitle(response.title);
-      } else {
-        response = await moviedb.tvInfo({id: id});
-        setMediaTitle(`${response.name} - Season ${season} Episode ${episode}`);
-      }
-    }
-    fetchMediaTitle();
-  }, [id, type]);
-
-  useEffect(() => {
-    console.log('duration', duration);
-  }, [duration]);
-
-  global.videoRef = videoRef;
-
   const formatTime = seconds => {
+    if (!seconds || isNaN(seconds) || seconds < 0) return '00:00';
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);
     const s = Math.floor(seconds % 60);
-    return [h, m, s]
-      .map(v => (v < 10 ? '0' + v : v))
-      .filter((v, i) => v !== '00' || i > 0)
-      .join(':');
+    if (h > 0) {
+      return `${h}:${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+    return `${m < 10 ? '0' : ''}${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   const handleSliderChange = value => {
-    videoRef.current.seek(value);
-    setCurrentTime(value);
+    if (videoRef?.current) {
+      videoRef.current.seek(value);
+      setCurrentTime(value);
+    }
   };
 
   const toggleControls = () => {
-    setControlsVisible(!controlsVisible);
+    if (showAudioSubModal || showEpisodesPanel || showSpeedMenu) {
+      setShowAudioSubModal(false);
+      setShowEpisodesPanel(false);
+      setShowSpeedMenu(false);
+      return;
+    }
+    const nextState = !controlsVisible;
+    setControlsVisible(nextState);
     Animated.timing(fadeAnim, {
-      toValue: controlsVisible ? 0 : 1,
-      duration: 300,
+      toValue: nextState ? 1 : 0,
+      duration: 250,
       useNativeDriver: true,
     }).start();
   };
@@ -191,19 +241,23 @@ const ExtraControls = ({
 
   const handleScreenPress = event => {
     const now = Date.now();
-    const DOUBLE_PRESS_DELAY = 200;
+    const DOUBLE_PRESS_DELAY = 250;
     if (lastTap.current && now - lastTap.current < DOUBLE_PRESS_DELAY) {
       const {locationX} = event.nativeEvent;
       if (locationX < width / 3) {
-        // Decrease current time by 10 seconds
-        const newTime = Math.max(currentTime - 10, 0);
-        videoRef.current.seek(newTime);
-        setCurrentTime(newTime);
+        // Rewind 10s
+        const newTime = Math.max(liveCurrentTime - 10, 0);
+        if (videoRef?.current) {
+          videoRef.current.seek(newTime);
+          setCurrentTime(newTime);
+        }
       } else if (locationX > (2 * width) / 3) {
-        // Increase current time by 10 seconds
-        const newTime = Math.min(currentTime + 10, duration);
-        videoRef.current.seek(newTime);
-        setCurrentTime(newTime);
+        // Fast forward 10s
+        const newTime = Math.min(liveCurrentTime + 10, duration);
+        if (videoRef?.current) {
+          videoRef.current.seek(newTime);
+          setCurrentTime(newTime);
+        }
       }
       lastTap.current = null;
     } else {
@@ -217,8 +271,67 @@ const ExtraControls = ({
     }
   };
 
+  const playEpisode = async (targetSeason, targetEpisode) => {
+    try {
+      setShowEpisodesPanel(false);
+      const s = await moviedb.seasonInfo({id, season_number: targetSeason});
+      const info = await moviedb.tvInfo({id});
+      const externalIds = await moviedb.episodeExternalIds({
+        id,
+        season_number: targetSeason,
+        episode_number: targetEpisode,
+      });
+
+      navigation.replace('VideoPlayer', {
+        id,
+        type: 'tv',
+        season: targetSeason,
+        episode: targetEpisode,
+        imdbId: externalIds.imdb_id,
+      });
+
+      state.addToContinueWatching({
+        id: info.id,
+        title: info.name,
+        image: `https://image.tmdb.org/t/p/w500/${info.poster_path}`,
+        type: 'tv',
+        season: targetSeason,
+        episode: targetEpisode,
+        year: info.first_air_date?.split('-')[0],
+      });
+    } catch (e) {
+      console.warn('playEpisode error', e);
+    }
+  };
+
+  const handleNextEpisode = async () => {
+    if (type !== 'tv' || !season || !episode) return;
+    if (seasonEpisodes.length > 0 && episode < seasonEpisodes.length) {
+      playEpisode(season, episode + 1);
+    } else if (season < totalSeasons) {
+      playEpisode(season + 1, 1);
+    }
+  };
+
+  const isMuted = volume === 0;
+  const toggleMute = () => {
+    if (setVolume) {
+      setVolume(isMuted ? 1 : 0);
+    }
+  };
+
+  // Remaining time
+  const remainingTimeStr = formatTime(Math.max(0, duration - liveCurrentTime));
+
+  // Display title formatted like Image 1
+  const displayTitle =
+    type === 'tv'
+      ? `${mediaTitle} E${episode || 1} ${episodeTitle || ''}`.trim()
+      : mediaTitle;
+
   return (
-    <View style={{flex: 1}}>
+    <View style={styles.container}>
+      {/* Background touchable for tap / double tap */}
       <TouchableWithoutFeedback
         onPress={event => {
           if (isLocked) {
@@ -227,323 +340,502 @@ const ExtraControls = ({
             handleScreenPress(event);
           }
         }}>
-        <View style={styles.container}>
-          <Animated.View
-            style={[
-              styles.unlockButtonContainer,
-              {opacity: unlockButtonAnim, display: isLocked ? 'flex' : 'none'},
-            ]}>
-            <Button
-              icon="lock-open"
-              onPress={handleUnlockPress}
-              style={{width: 100}}
-              mode="contained-tonal">
-              Unlock
-            </Button>
-          </Animated.View>
-          <Animated.View
-            style={[
-              styles.extraControlsContainer,
-              {opacity: fadeAnim, display: controlsVisible ? 'flex' : 'none'},
-            ]}>
-            {playerError && (
-              <View style={styles.errorContainer}>
-                <Headline style={styles.errorText}>
-                  {typeof playerError === 'string'
-                    ? playerError
-                    : 'error, change quality'}
-                </Headline>
-              </View>
-            )}
-            <View style={styles.appBar}>
-              <IconButton
-                icon={'arrow-left'}
-                size={30}
-                onPress={() => {
-                  navigation.goBack();
-                }}
-              />
-              <Text style={{color: 'white', fontSize: 20}}>{mediaTitle}</Text>
-            </View>
-            <View style={styles.extraControls}>
-              <View style={styles.controlButtons}>
-                <IconButton
-                  size={30}
-                  icon="rewind-10"
-                  mode="contained"
-                  onPress={() => {
-                    videoRef.current.seek(liveCurrentTime - 10);
-                    setCurrentTime(liveCurrentTime - 10);
-                  }}
-                />
-                <IconButton
-                  size={40}
-                  icon={isPlaying ? 'pause' : 'play'}
-                  mode="contained"
-                  onPress={() => {
-                    if (isPlaying) {
-                      setAdsVisible(true);
-                      setCanCloseAds(false);
+        <View style={StyleSheet.absoluteFillObject} />
+      </TouchableWithoutFeedback>
 
-                      setTimeout(() => {
-                        setCanCloseAds(true);
-                      }, 6000);
-                    } else {
-                      setAdsVisible(false);
-                      setCanCloseAds(true);
-                    }
-                    setIsPlaying(!isPlaying);
-                  }}
-                />
-                <IconButton
-                  size={30}
-                  icon="fast-forward-10"
-                  mode="contained"
-                  onPress={() => {
-                    videoRef.current.seek(liveCurrentTime + 10);
-                    setCurrentTime(liveCurrentTime + 10);
-                  }}
-                />
-              </View>
-              <View style={styles.horizontalLayout}>
-                <IconButton
-                  icon="minus"
-                  mode="contained"
-                  onPress={() => setSubtitleDelay(subtitleDelay + 1)}
-                />
-                <IconButton
-                  icon="plus"
-                  mode="contained"
-                  onPress={() => {
-                    setSubtitleDelay(subtitleDelay - 1);
-                  }}
-                />
-              </View>
-            </View>
-            <View style={styles.bottomControls}>
-              <View style={styles.sliderContainer}>
-                <Text style={styles.timestamp}>
-                  {formatTime(liveCurrentTime)}
-                </Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={0}
-                  maximumValue={duration}
-                  value={liveCurrentTime}
-                  onValueChange={handleSliderChange}
-                />
-                <Text style={styles.timestamp}>{formatTime(duration)}</Text>
-              </View>
-              <View style={styles.bottomButtons}>
-                <Button icon="subtitles" onPress={openSubtitleModal}>
-                  Subtitles
-                </Button>
-                <Button icon="lock" onPress={handleLockPress}>
-                  Lock
-                </Button>
-                <Menu
-                  visible={visible}
-                  onDismiss={closeMenu}
-                  anchor={
-                    <Button icon="quality-high" onPress={openMenu}>
-                      Quality
-                    </Button>
-                  }>
-                  {playerQualities.map((quality, index) => (
-                    <Menu.Item
-                      key={index}
-                      onPress={() => {
-                        setUri(quality.uri);
-                        closeMenu();
-                      }}
-                      title={quality.resolution}
-                    />
-                  ))}
-                </Menu>
+      {/* Unlock button when locked */}
+      <Animated.View
+        pointerEvents={isLocked ? 'box-none' : 'none'}
+        style={[
+          styles.unlockButtonContainer,
+          {opacity: unlockButtonAnim, display: isLocked ? 'flex' : 'none'},
+        ]}>
+        <TouchableOpacity
+          onPress={handleUnlockPress}
+          style={styles.unlockButton}>
+          <Icon source="lock-open-outline" size={24} color="#fff" />
+          <Text style={{color: '#fff', fontWeight: 'bold', marginLeft: 8}}>
+            Unlock
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
 
-                {season && episode && (
-                  <Button
-                    icon={'arrow-right'}
-                    onPress={async () => {
-                      const s = await moviedb.seasonInfo({
-                        id: id,
-                        season: season,
-                      });
-
-                      const info = await moviedb.tvInfo({
-                        id: id,
-                        append_to_response: 'seasons',
-                      });
-
-                      if (episode < s.episodes.length) {
-                        const externalIds = await moviedb.episodeExternalIds({
-                          id: id,
-                          season_number: s.season_number,
-                          episode_number: episode + 1,
-                        });
-
-                        navigation.replace('VideoPlayer', {
-                          id: id,
-                          type: 'tv',
-                          season: s.season_number,
-                          episode: episode + 1,
-                          imdbId: externalIds.imdb_id,
-                        });
-                        state.addToContinueWatching({
-                          id: info.id,
-                          title: info.name,
-                          image: `https://image.tmdb.org/t/p/w500/${info.poster_path}`,
-                          type: 'tv',
-                          season: s.season_number,
-                          episode: episode + 1,
-                          year: info.first_air_date?.split('-')[0],
-                        });
-                      } else {
-                        const nextSeason = await moviedb.seasonInfo({
-                          id: id,
-                          season: s.season_number + 1,
-                        });
-
-                        if (nextSeason) {
-                          const externalIds = await moviedb.episodeExternalIds({
-                            id: id,
-                            season_number: nextSeason.season_number,
-                            episode_number: 1,
-                          });
-
-                          navigation.replace('VideoPlayer', {
-                            id: id,
-                            type: 'tv',
-                            season: nextSeason.season_number,
-                            episode: 1,
-                            imdbId: externalIds.imdb_id,
-                          });
-                          state.addToContinueWatching({
-                            id: info.id,
-                            title: info.name,
-                            image: `https://image.tmdb.org/t/p/w500/${info.poster_path}`,
-                            type: 'tv',
-                            season: nextSeason.season_number,
-                            episode: 1,
-                            year: info.first_air_date?.split('-')[0],
-                          });
-                        }
-                      }
-                    }}>
-                    Next Episode
-                  </Button>
-                )}
-
-                <Button
-                  icon="aspect-ratio"
-                  onPress={() => {
-                    if (resizeIndex === 3) {
-                      setResizeIndex(0);
-                    } else {
-                      setResizeIndex(resizeIndex + 1);
-                    }
-                    setResizeMode(resizeModes[resizeIndex]);
-                  }}
-                />
-              </View>
-            </View>
-          </Animated.View>
-          <Subtitle
-            {...{subtitleText, subtitleIsVisible, isRtl, controlsVisible}}
+      {/* Main Overlay Controls */}
+      <Animated.View
+        pointerEvents={controlsVisible && !isLocked ? 'box-none' : 'none'}
+        style={[
+          styles.overlayContainer,
+          {opacity: fadeAnim, display: controlsVisible && !isLocked ? 'flex' : 'none'},
+        ]}>
+        {/* Top Header Bar */}
+        <View style={styles.topBar}>
+          <IconButton
+            icon="arrow-left"
+            iconColor="#fff"
+            size={28}
+            onPress={() => navigation.goBack()}
+          />
+          <View style={{flex: 1}} />
+          <IconButton
+            icon="flag-outline"
+            iconColor="#fff"
+            size={24}
+            onPress={() => {}}
           />
         </View>
-      </TouchableWithoutFeedback>
+
+        {/* Error message */}
+        {playerError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>
+              {typeof playerError === 'string'
+                ? playerError
+                : 'Unable to stream. Please try another quality.'}
+            </Text>
+          </View>
+        )}
+
+        {/* Bottom Controls Bar (Netflix Style - Image 1) */}
+        <View style={styles.bottomBar}>
+          {/* Progress Timeline Row */}
+          <View style={styles.timelineRow}>
+            <Slider
+              style={styles.slider}
+              minimumValue={0}
+              maximumValue={duration > 0 ? duration : 1}
+              value={liveCurrentTime}
+              onValueChange={handleSliderChange}
+              minimumTrackTintColor="#E50914"
+              maximumTrackTintColor="rgba(255, 255, 255, 0.3)"
+              thumbTintColor="#E50914"
+            />
+            <Text style={styles.remainingTimeText}>
+              {remainingTimeStr}
+            </Text>
+          </View>
+
+          {/* Controls Actions Row */}
+          <View style={styles.actionsRow}>
+            {/* Left Controls: Play/Pause, Rewind, Forward, Volume */}
+            <View style={styles.leftActions}>
+              <TouchableOpacity
+                onPress={() => setIsPlaying(!isPlaying)}
+                style={styles.iconButtonTouch}>
+                <Icon
+                  source={isPlaying ? 'pause' : 'play'}
+                  size={30}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const newTime = Math.max(liveCurrentTime - 10, 0);
+                  if (videoRef?.current) {
+                    videoRef.current.seek(newTime);
+                    setCurrentTime(newTime);
+                  }
+                }}
+                style={styles.iconButtonTouch}>
+                <Icon source="rewind-10" size={28} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const newTime = Math.min(liveCurrentTime + 10, duration);
+                  if (videoRef?.current) {
+                    videoRef.current.seek(newTime);
+                    setCurrentTime(newTime);
+                  }
+                }}
+                style={styles.iconButtonTouch}>
+                <Icon source="fast-forward-10" size={28} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={toggleMute}
+                style={styles.iconButtonTouch}>
+                <Icon
+                  source={isMuted ? 'volume-off' : 'volume-high'}
+                  size={26}
+                  color="#fff"
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Center: Title & Episode */}
+            <View style={styles.centerTitleContainer}>
+              <Text numberOfLines={1} style={styles.centerTitleText}>
+                {displayTitle}
+              </Text>
+            </View>
+
+            {/* Right Controls: Next Ep, Episodes, Audio/Sub, Speed, Aspect, Lock */}
+            <View style={styles.rightActions}>
+              {type === 'tv' && (
+                <TouchableOpacity
+                  onPress={handleNextEpisode}
+                  style={styles.iconButtonTouch}>
+                  <Icon source="skip-next" size={28} color="#fff" />
+                </TouchableOpacity>
+              )}
+
+              {type === 'tv' && (
+                <TouchableOpacity
+                  onPress={() => {
+                    console.log('EPISODES PRESSED', {
+                      cur: showEpisodesPanel,
+                      type,
+                      season,
+                      selectedSeason,
+                      count: seasonEpisodes.length,
+                    });
+                    setShowEpisodesPanel(prev => !prev);
+                    setShowAudioSubModal(false);
+                    setShowSpeedMenu(false);
+                  }}
+                  style={styles.iconButtonTouch}>
+                  <Icon source="playlist-play" size={28} color="#fff" />
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowAudioSubModal(!showAudioSubModal);
+                  setShowEpisodesPanel(false);
+                  setShowSpeedMenu(false);
+                }}
+                style={styles.iconButtonTouch}>
+                <Icon source="message-text-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSpeedMenu(!showSpeedMenu);
+                  setShowAudioSubModal(false);
+                  setShowEpisodesPanel(false);
+                }}
+                style={styles.iconButtonTouch}>
+                <Icon source="speedometer" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  const nextIndex = (resizeIndex + 1) % resizeModes.length;
+                  setResizeIndex(nextIndex);
+                  setResizeMode(resizeModes[nextIndex]);
+                }}
+                style={styles.iconButtonTouch}>
+                <Icon source="aspect-ratio" size={24} color="#fff" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleLockPress}
+                style={styles.iconButtonTouch}>
+                <Icon source="lock-outline" size={22} color="#fff" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Animated.View>
+
+      {/* Subtitles Text Overlay */}
+      <Subtitle
+        subtitleText={subtitleText}
+        subtitleIsVisible={subtitleIsVisible}
+        isRtl={isRtl}
+        controlsVisible={controlsVisible && !isLocked}
+      />
+
+      {/* Netflix-Style Audio & Subtitles Overlay (Image 2) */}
+      {showAudioSubModal && (
+        <View style={styles.modalCenteredOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setShowAudioSubModal(false)}
+          />
+          <View style={[styles.audioSubCard, {maxWidth: isTablet ? 560 : 480}]}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardHeaderTitle}>Audio & Subtitles</Text>
+              <IconButton
+                icon="close"
+                iconColor="#fff"
+                size={22}
+                onPress={() => setShowAudioSubModal(false)}
+              />
+            </View>
+            <Divider style={{backgroundColor: 'rgba(255,255,255,0.15)', marginBottom: 12}} />
+
+            <View style={styles.twoColumnBody}>
+              {/* Left Column: Audio & Quality */}
+              <View style={styles.columnBox}>
+                <Text style={styles.columnHeading}>Audio & Quality</Text>
+                <ScrollView style={{maxHeight: isTablet ? 380 : 220}}>
+                  <TouchableOpacity
+                    style={styles.selectableRow}
+                    onPress={() => {}}>
+                    <View style={styles.checkIconBox}>
+                      <Icon source="check" size={18} color="#fff" />
+                    </View>
+                    <Text style={styles.selectableText}>Original [Default]</Text>
+                  </TouchableOpacity>
+
+                  {playerQualities.map((q, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.selectableRow}
+                      onPress={() => {
+                        setUri(q.uri);
+                      }}>
+                      <View style={styles.checkIconBox} />
+                      <Text style={styles.selectableText}>{q.resolution || 'Auto'}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Right Column: Subtitles */}
+              <View style={[styles.columnBox, {borderLeftWidth: 1, borderLeftColor: 'rgba(255,255,255,0.1)', paddingLeft: 16}]}>
+                <Text style={styles.columnHeading}>Subtitles</Text>
+                <ScrollView style={{maxHeight: isTablet ? 380 : 220}}>
+                  {/* Off Option */}
+                  <TouchableOpacity
+                    style={styles.selectableRow}
+                    onPress={() => setSubtitleIsVisible(false)}>
+                    <View style={styles.checkIconBox}>
+                      {!subtitleIsVisible && <Icon source="check" size={18} color="#fff" />}
+                    </View>
+                    <Text style={styles.selectableText}>Off</Text>
+                  </TouchableOpacity>
+
+                  {/* Languages */}
+                  {langs.map(l => (
+                    <TouchableOpacity
+                      key={l.code}
+                      style={styles.selectableRow}
+                      onPress={() => {
+                        setSelectedLang(l.code);
+                        setCurrentLang(l.lang);
+                        setSubtitleIsVisible(true);
+                      }}>
+                      <View style={styles.checkIconBox}>
+                        {subtitleIsVisible && currentLang === l.lang && (
+                          <Icon source="check" size={18} color="#fff" />
+                        )}
+                      </View>
+                      <Text style={styles.selectableText}>{l.lang}</Text>
+                    </TouchableOpacity>
+                  ))}
+
+                  {/* Subtitle track number */}
+                  <View style={{marginTop: 12}}>
+                    <Text style={[styles.columnHeading, {fontSize: 13, marginBottom: 6}]}>
+                      Track
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {[0, 1, 2, 3, 4].map(idx => (
+                        <TouchableOpacity
+                          key={idx}
+                          onPress={() => setSubtitleNumber(idx)}
+                          style={[
+                            styles.chipPill,
+                            subtitleNumber === idx && styles.chipPillActive,
+                          ]}>
+                          <Text style={{color: '#fff', fontSize: 12}}>
+                            #{idx + 1}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+
+                  {/* Subtitle Delay adjustment */}
+                  <View style={{marginTop: 12}}>
+                    <Text style={[styles.columnHeading, {fontSize: 13, marginBottom: 6}]}>
+                      Sync Delay ({subtitleDelay > 0 ? `+${subtitleDelay}s` : `${subtitleDelay}s`})
+                    </Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <TouchableOpacity
+                        onPress={() => setSubtitleDelay(subtitleDelay - 1)}
+                        style={styles.delayButton}>
+                        <Text style={{color: '#fff', fontSize: 13}}>-1s</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setSubtitleDelay(0)}
+                        style={[styles.delayButton, {marginHorizontal: 8}]}>
+                        <Text style={{color: '#fff', fontSize: 13}}>Reset</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setSubtitleDelay(subtitleDelay + 1)}
+                        style={styles.delayButton}>
+                        <Text style={{color: '#fff', fontSize: 13}}>+1s</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </ScrollView>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* Netflix-Style Episodes Panel (Image 3) */}
+      {showEpisodesPanel && (
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setShowEpisodesPanel(false)}
+          />
+          <View style={[styles.episodesDrawer, {width: isTablet ? 480 : 380}]}>
+            {/* Header: Season selector & close */}
+            <View style={styles.episodesHeader}>
+              <TouchableOpacity
+                onPress={() => setSeasonDropdownVisible(!seasonDropdownVisible)}
+                style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Text style={{color: '#fff', fontSize: 18, fontWeight: 'bold'}}>
+                  Season {selectedSeason}
+                </Text>
+                <Icon source="chevron-down" size={20} color="#fff" />
+              </TouchableOpacity>
+              <IconButton
+                icon="close"
+                iconColor="#fff"
+                size={22}
+                onPress={() => setShowEpisodesPanel(false)}
+              />
+            </View>
+
+            {/* Season Dropdown List if opened */}
+            {seasonDropdownVisible && (
+              <View style={styles.seasonDropdown}>
+                <ScrollView style={{maxHeight: 160}}>
+                  {Array.from({length: totalSeasons}, (_, i) => i + 1).map(sNum => (
+                    <TouchableOpacity
+                      key={sNum}
+                      onPress={() => {
+                        setSelectedSeason(sNum);
+                        setSeasonDropdownVisible(false);
+                      }}
+                      style={[
+                        styles.seasonItem,
+                        selectedSeason === sNum && styles.seasonItemActive,
+                      ]}>
+                      <Text style={{color: '#fff', fontSize: 14}}>
+                        Season {sNum}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            <Divider style={{backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 8}} />
+
+            {/* Episodes List */}
+            <FlatList
+              data={seasonEpisodes}
+              keyExtractor={item => item.id.toString()}
+              showsVerticalScrollIndicator={false}
+              renderItem={({item}) => {
+                const isCurrentEpisode =
+                  selectedSeason === season && item.episode_number === episode;
+
+                if (isCurrentEpisode) {
+                  // Expanded active card like in Image 3
+                  return (
+                    <View style={styles.activeEpisodeCard}>
+                      <Text style={styles.activeEpisodeTitle}>
+                        {item.episode_number}  {item.name}
+                      </Text>
+                      <View style={{flexDirection: 'row', marginTop: 8}}>
+                        <View style={styles.activeStillContainer}>
+                          {item.still_path ? (
+                            <Image
+                              source={{
+                                uri: `https://image.tmdb.org/t/p/w500/${item.still_path}`,
+                              }}
+                              style={{width: '100%', height: '100%'}}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={{flex: 1, backgroundColor: '#222'}} />
+                          )}
+                          <View style={styles.nowPlayingBadge}>
+                            <Icon source="volume-high" size={14} color="#fff" />
+                            <Text style={styles.nowPlayingText}>Now Playing</Text>
+                          </View>
+                        </View>
+                        <View style={{flex: 1, paddingLeft: 12}}>
+                          <Text numberOfLines={3} style={styles.activeEpisodeOverview}>
+                            {item.overview || 'Now playing on Tefrija'}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  );
+                }
+
+                // Regular episode row like in Image 3
+                return (
+                  <TouchableOpacity
+                    onPress={() => playEpisode(selectedSeason, item.episode_number)}
+                    style={styles.episodeRow}>
+                    <Text style={styles.episodeRowNumber}>
+                      {item.episode_number}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.episodeRowTitle}>
+                      {item.name}
+                    </Text>
+                    <Icon source="play-outline" size={20} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
+                );
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* Speed Menu Popup */}
+      {showSpeedMenu && (
+        <View style={styles.modalCenteredOverlay}>
+          <TouchableOpacity
+            style={StyleSheet.absoluteFillObject}
+            onPress={() => setShowSpeedMenu(false)}
+          />
+          <View style={styles.speedCard}>
+            <Text style={styles.speedHeader}>Playback Speed</Text>
+            <Divider style={{backgroundColor: 'rgba(255,255,255,0.15)', marginVertical: 8}} />
+            {speeds.map(s => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => {
+                  if (setPlaybackRate) setPlaybackRate(s);
+                  setShowSpeedMenu(false);
+                }}
+                style={styles.speedRow}>
+                <View style={styles.checkIconBox}>
+                  {playbackRate === s && <Icon source="check" size={18} color="#fff" />}
+                </View>
+                <Text style={styles.speedText}>{s === 1.0 ? '1.0x (Normal)' : `${s}x`}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Background hidden ad WebView if present */}
       {adUrl && (
         <View
           style={{
-            width: '100%',
-            height: '100%',
+            width: 1,
+            height: 1,
             position: 'absolute',
             top: -1000,
             left: -1000,
           }}>
-          <WebView
-            source={{
-              uri: adUrl,
-            }}
-            style={{width: '100%', height: '100%'}}
-          />
+          <WebView source={{uri: adUrl}} style={{width: 1, height: 1}} />
         </View>
       )}
-      <Portal>
-        <Dialog
-          theme={{
-            dark: colorScheme === 'dark',
-          }}
-          visible={subtitleModalVisible}
-          dismissableBackButton={true}
-          onDismiss={() => {
-            closeSubtitleModal();
-          }}>
-          <IconButton
-            icon="close"
-            onPress={closeSubtitleModal}
-            style={{
-              position: 'absolute',
-              right: 0,
-              top: -10,
-            }}
-          />
-          <Dialog.Content>
-            <View style={{flexDirection: 'row', padding: 10}}>
-              <View style={{flex: 1, paddingRight: 8}}>
-                <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-                  <Headline style={{marginRight: 12}}>Subtitles</Headline>
-                  <Button
-                    mode="text"
-                    compact={true}
-                    onPress={() => setSubtitleIsVisible(!subtitleIsVisible)}
-                    icon={subtitleIsVisible ? 'eye-off' : 'eye'}
-                    style={{marginRight: 12}}
-                  >
-                    {subtitleIsVisible ? 'Hide Subtitle' : 'Show Subtitle'}
-                  </Button>
-                  <View style={{flex: 1, alignItems: 'flex-end'}}>
-                    <Chip mode="outlined" disabled={true}>
-                      {currentLang} {subtitleNumber + 1}
-                    </Chip>
-                  </View>
-                </View>
-                <Divider style={{marginVertical: 8}} />
-                <ScrollView style={{height: 200}}>
-                  {langs.map(lang => (
-                    <List.Item
-                      key={lang.code}
-                      onPress={() => {
-                        setSelectedLang(lang.code);
-                        setCurrentLang(lang.lang);
-                      }}
-                      title={lang.lang}
-                    />
-                  ))}
-                  <Divider />
-                  {subtitleManager.langs.map((lang, idx) => (
-                    <List.Item key={lang.title || idx} onPress={() => {}} title={lang.title} />
-                  ))}
-                </ScrollView>
-              </View>
-              <View style={{flex: 1}}>
-                <ScrollView style={{height: 200}}>
-                  {new Array(15).fill(0).map((n, index) => (
-                    <List.Item
-                      key={index}
-                      onPress={() => {
-                        setSubtitleNumber(index);
-                      }}
-                      title={`${currentLang} ${index + 1}`}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            </View>
-          </Dialog.Content>
-        </Dialog>
-      </Portal>
     </View>
   );
 };
@@ -558,125 +850,376 @@ const Subtitle = ({
     pointerEvents="none"
     style={{
       ...styles.subtitleContainer,
-      zIndex: -100,
+      zIndex: 50,
+      bottom: controlsVisible ? 100 : 30,
     }}>
-    <Headline
-      pointerEvents="none"
-      style={{
-        ...styles.subtitleText,
-        textAlign: isRtl ? 'right' : 'left',
-        bottom: controlsVisible ? 70 : 20,
-      }}>
-      {subtitleIsVisible ? subtitleText?.trim() : ''}
-    </Headline>
+    {subtitleIsVisible && !!subtitleText?.trim() && (
+      <View style={styles.subtitleBox}>
+        <Text
+          style={[
+            styles.subtitleText,
+            {textAlign: isRtl ? 'right' : 'center'},
+          ]}>
+          {subtitleText.trim()}
+        </Text>
+      </View>
+    )}
   </View>
 );
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    zIndex: 10,
   },
-  videoPlayer: {
-    flex: 10,
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
-  horizontalLayout: {
+  topBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    zIndex: 20,
   },
   errorContainer: {
     position: 'absolute',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    color: 'black',
+    top: 75,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(229, 9, 20, 0.85)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    zIndex: 25,
   },
   errorText: {
-    color: 'white',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 5,
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
-  modalContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    margin: 20,
-    borderRadius: 10,
-    width: 300,
-    alignSelf: 'center',
-  },
-  modalContainerDark: {
-    backgroundColor: '#333',
-    padding: 20,
-    margin: 20,
-    borderRadius: 10,
-    width: 300,
-    alignSelf: 'center',
-  },
-  extraControlsContainer: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-  },
-  extraControls: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  controlButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  subtitleContainer: {
-    position: 'absolute',
-    left: 0,
-    bottom: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
-  subtitleText: {
-    color: 'white',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 5,
-  },
-  bottomControls: {
+  bottomBar: {
     position: 'absolute',
     bottom: 0,
-    width: '100%',
-    height: 80,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    paddingTop: 10,
+    zIndex: 20,
   },
-  sliderContainer: {
+  timelineRow: {
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
-    marginTop: 15,
+    marginBottom: 6,
   },
   slider: {
     flex: 1,
+    height: 40,
+    marginRight: 12,
   },
-  timestamp: {
-    color: 'white',
-    marginLeft: 10,
+  remainingTimeText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
+    minWidth: 48,
+    textAlign: 'right',
   },
-  bottomButtons: {
+  actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  appBar: {
-    height: 50,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+  leftActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-
-  unlockButtonContainer: {
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconButtonTouch: {
+    padding: 8,
+    marginHorizontal: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  centerTitleContainer: {
     flex: 1,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    paddingTop: 20,
+  },
+  centerTitleText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  unlockButtonContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    zIndex: 150,
+  },
+  unlockButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderWidth: 1,
+    borderColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  subtitleContainer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  subtitleBox: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  subtitleText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.9)',
+    textShadowOffset: {width: 1, height: 1},
+    textShadowRadius: 3,
+  },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    zIndex: 100,
+  },
+  modalCenteredOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    zIndex: 100,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioSubCard: {
+    width: '90%',
+    backgroundColor: '#181818',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    elevation: 12,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  cardHeaderTitle: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  twoColumnBody: {
+    flexDirection: 'row',
+  },
+  columnBox: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  columnHeading: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  selectableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  checkIconBox: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: 6,
+  },
+  selectableText: {
+    color: '#ffffff',
+    fontSize: 14,
+  },
+  chipPill: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    marginRight: 6,
+  },
+  chipPillActive: {
+    backgroundColor: '#E50914',
+  },
+  delayButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  episodesDrawer: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    right: 0,
+    height: '100%',
+    backgroundColor: '#141414',
+    padding: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(255,255,255,0.1)',
+    elevation: 16,
+    zIndex: 110,
+  },
+  episodesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+  },
+  seasonDropdown: {
+    backgroundColor: '#222',
+    borderRadius: 8,
+    padding: 6,
+    marginVertical: 6,
+  },
+  seasonItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  seasonItemActive: {
+    backgroundColor: '#333',
+  },
+  activeEpisodeCard: {
+    backgroundColor: '#202020',
+    borderWidth: 1.5,
+    borderColor: '#ffffff',
+    borderRadius: 8,
+    padding: 12,
+    marginVertical: 8,
+  },
+  activeEpisodeTitle: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  activeStillContainer: {
+    width: 120,
+    height: 70,
+    borderRadius: 6,
+    overflow: 'hidden',
+    backgroundColor: '#333',
+  },
+  nowPlayingBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    right: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 4,
+    paddingVertical: 2,
+  },
+  nowPlayingText: {
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  activeEpisodeOverview: {
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  episodeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
+  },
+  episodeRowNumber: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+    width: 28,
+  },
+  episodeRowTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    flex: 1,
+    paddingRight: 8,
+  },
+  speedCard: {
+    width: 260,
+    backgroundColor: '#181818',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    elevation: 12,
+  },
+  speedHeader: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  speedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  speedText: {
+    color: '#ffffff',
+    fontSize: 14,
   },
 });
 

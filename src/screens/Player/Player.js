@@ -1,4 +1,4 @@
-import React, {useRef, useState} from 'react';
+import React, {useRef, useState, useEffect} from 'react';
 import Video from 'react-native-video';
 import {Dimensions, StyleSheet, TouchableOpacity, View} from 'react-native';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
@@ -41,13 +41,18 @@ const Player = ({
   const [liveCurrentTime, setLiveCurrentTime] = useState(0);
 
   const [resizeMode, setResizeMode] = useState('cover');
+  const [volume, setVolume] = useState(1);
+  const [playbackRate, setPlaybackRate] = useState(1.0);
 
-  SystemNavigationBar.stickyImmersive();
+  useEffect(() => {
+    SystemNavigationBar.stickyImmersive();
+  }, []);
 
   return (
-    <>
+    <View style={styles.container}>
       <Video
-        volume={1}
+        volume={volume}
+        rate={playbackRate}
         ref={videoRef}
         paused={!isPlaying}
         controls={false}
@@ -118,8 +123,12 @@ const Player = ({
         type={type}
         resizeMode={resizeMode}
         setResizeMode={setResizeMode}
+        volume={volume}
+        setVolume={setVolume}
+        playbackRate={playbackRate}
+        setPlaybackRate={setPlaybackRate}
       />
-    </>
+    </View>
   );
 };
 
@@ -130,10 +139,11 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'black',
   },
   videoPlayer: {
-    //width: Dimensions.get('screen').width,
-    //height: Dimensions.get('screen').height,
     width: '100%',
     height: '100%',
     position: 'absolute',

@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Paragraph,
 } from 'react-native-paper';
+import useResponsive from '../utils/useResponsive';
 
 const CURRENT_VERSION = '0.1.9';
 
@@ -16,6 +17,7 @@ const UpdatesScreen = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateUrl, setUpdateUrl] = useState('');
   const [versionDescription, setVersionDescription] = useState('');
+  const {isTablet} = useResponsive();
 
   const checkForUpdates = async () => {
     setLoading(true);
@@ -42,40 +44,42 @@ const UpdatesScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Card>
-        <Card.Content>
-          <Subheading>Check for Updates</Subheading>
-          <Caption>Press the button below to check for updates.</Caption>
-        </Card.Content>
-        <Card.Actions>
-          <Button
-            mode="contained"
-            onPress={checkForUpdates}
-            disabled={loading}
-            loading={loading}>
-            Check for Updates
-          </Button>
-        </Card.Actions>
-      </Card>
-
-      {updateAvailable && (
-        <Card style={styles.updateCard}>
+      <View style={{width: '100%', maxWidth: isTablet ? 680 : undefined, alignSelf: 'center'}}>
+        <Card>
           <Card.Content>
-            <Subheading>Update Available</Subheading>
-            <Caption>
-              An update is available. Click the button below to update.
-            </Caption>
-            <Paragraph style={{padding: 5}}>{versionDescription}</Paragraph>
+            <Subheading>Check for Updates</Subheading>
+            <Caption>Press the button below to check for updates.</Caption>
           </Card.Content>
           <Card.Actions>
-            <Button mode="contained" onPress={openUpdateUrl}>
-              Update Now
+            <Button
+              mode="contained"
+              onPress={checkForUpdates}
+              disabled={loading}
+              loading={loading}>
+              Check for Updates
             </Button>
           </Card.Actions>
         </Card>
-      )}
 
-      {loading && <ActivityIndicator style={styles.loading} size="large" />}
+        {updateAvailable && (
+          <Card style={styles.updateCard}>
+            <Card.Content>
+              <Subheading>Update Available</Subheading>
+              <Caption>
+                An update is available. Click the button below to update.
+              </Caption>
+              <Paragraph style={{padding: 5}}>{versionDescription}</Paragraph>
+            </Card.Content>
+            <Card.Actions>
+              <Button mode="contained" onPress={openUpdateUrl}>
+                Update Now
+              </Button>
+            </Card.Actions>
+          </Card>
+        )}
+
+        {loading && <ActivityIndicator style={styles.loading} size="large" />}
+      </View>
     </View>
   );
 };

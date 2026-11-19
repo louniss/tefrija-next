@@ -7,6 +7,7 @@ import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
 import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import useResponsive from '../utils/useResponsive';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
 const SearchScreen = () => {
@@ -26,6 +27,7 @@ const SearchScreen = () => {
   const [lastQuery, setLastQuery] = React.useState('');
 
   const navigation = useNavigation();
+  const { isTablet } = useResponsive();
 
   const search = async (reset, overridePage, overrideQuery) => {
     const p = overridePage ?? page;
@@ -199,8 +201,16 @@ const SearchScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{ paddingBottom: 50 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 }}>
+    <SafeAreaView style={{ paddingBottom: 50, flex: 1 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: isTablet ? 16 : 8,
+          maxWidth: isTablet ? 800 : undefined,
+          width: '100%',
+          alignSelf: 'center',
+        }}>
         <IconButton
           icon="home"
           size={24}
@@ -337,9 +347,10 @@ const SearchScreen = () => {
             });
           }}
           renderItem={({ item }) => {
-            return <RenderCard item={item} />;
+            return <RenderCard item={item} isTablet={isTablet} />;
           }}
-          itemDimension={160}
+          itemDimension={isTablet ? 180 : 160}
+          spacing={isTablet ? 14 : 10}
           contentContainerStyle={{ alignContent: 'center' }}
         />
       ) : (
@@ -353,12 +364,13 @@ const SearchScreen = () => {
   );
 };
 
-const RenderCard = ({ item }) => {
+const RenderCard = ({ item, isTablet }) => {
   const navigation = useNavigation();
+  const imageHeight = isTablet ? 260 : 200;
 
   return (
-      <Pressable
-        onPress={() => {
+    <Pressable
+      onPress={() => {
         if (item.type === 'movie') {
           navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
         } else {
@@ -367,27 +379,30 @@ const RenderCard = ({ item }) => {
       }}>
       <View
         style={{
-          width: 160,
+          width: '100%',
           borderWidth: 1,
-          borderRadius: 5,
+          borderRadius: 8,
           borderColor: 'rgba(153, 153, 153, 0.2)',
-          justifyContent: 'center', // Center vertically
+          overflow: 'hidden',
         }}>
         <Image
           source={{
             uri: item.image,
           }}
-          style={{ width: '100%', height: 200 }}
+          style={{ width: '100%', height: imageHeight, borderTopLeftRadius: 7, borderTopRightRadius: 7 }}
+          resizeMode="cover"
         />
-        <Text
-          style={{
-            padding: 5,
-            overflow: 'scroll',
-            height: 50,
-            textAlignVertical: 'center',
-          }}>
-          {item.title} ({item.year})
-        </Text>
+        <View style={{ padding: 6, height: 48, justifyContent: 'center' }}>
+          <Text
+            numberOfLines={2}
+            style={{
+              textAlign: 'center',
+              fontSize: 13,
+              lineHeight: 18,
+            }}>
+            {item.title} {item.year ? `(${item.year})` : ''}
+          </Text>
+        </View>
 
         <Badge
           style={{

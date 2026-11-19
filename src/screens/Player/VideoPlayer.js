@@ -24,8 +24,11 @@ import Player from './Player';
 const subtitleManager = new SubtitleManager();
 
 const VideoPlayerScreen = ({route}) => {
-  SystemNavigationBar.stickyImmersive();
   const state = useMainState();
+
+  useEffect(() => {
+    SystemNavigationBar.stickyImmersive();
+  }, []);
 
   const videoRef = useRef(null);
   const [isPlaying, setIsPlaying] = useState(true);
@@ -99,9 +102,11 @@ const VideoPlayerScreen = ({route}) => {
   }, [route]);
 
   const navigation = useNavigation();
-  navigation.setOptions({
-    orientation: 'landscape',
-  });
+  useEffect(() => {
+    navigation.setOptions({
+      orientation: 'landscape',
+    });
+  }, [navigation]);
 
   const mediaKey = streamKey({type, id, season, episode});
   // Dev affordance: play a stream straight from its master url, bypassing the

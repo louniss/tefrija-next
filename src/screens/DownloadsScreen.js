@@ -15,6 +15,7 @@ import {
 
 import useStreamStore, {sortDownloads} from '../stream/store';
 import {clearStreamFiles} from '../stream/manager';
+import useResponsive from '../utils/useResponsive';
 
 const percentOf = item =>
   item.total ? Math.min(100, Math.round((item.done / item.total) * 100)) : 0;
@@ -307,6 +308,7 @@ const DownloadsScreen = ({navigation}) => {
   const theme = useTheme();
   const [expanded, setExpanded] = useState({});
   const [confirming, setConfirming] = useState(null);
+  const { isTablet } = useResponsive();
 
   const groups = useMemo(
     () => buildGroups(sortDownloads(downloads)),
@@ -367,33 +369,45 @@ const DownloadsScreen = ({navigation}) => {
     );
 
   return (
-    <>
-      <FlatList
-        data={groups}
-        keyExtractor={item => item.id}
-        renderItem={renderGroup}
-        extraData={expanded}
-        ListEmptyComponent={
-          <View style={{padding: 20}}>
-            <Caption>
-              Nothing downloaded yet. Use the download button on a movie or an
-              episode.
-            </Caption>
-          </View>
-        }
-        ListFooterComponent={
-          navigation ? (
-            <Button
-              style={{margin: 10}}
-              mode="text"
-              onPress={() => navigation.navigate('Home')}>
-              Browse
-            </Button>
-          ) : null
-        }
-      />
+    <View style={{ flex: 1 }}>
+      <View
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: isTablet ? 900 : undefined,
+          alignSelf: 'center',
+          paddingHorizontal: isTablet ? 16 : 0,
+        }}>
+        <FlatList
+          data={groups}
+          keyExtractor={item => item.id}
+          renderItem={renderGroup}
+          extraData={expanded}
+          ListEmptyComponent={
+            <View style={{padding: 20}}>
+              <Caption>
+                Nothing downloaded yet. Use the download button on a movie or an
+                episode.
+              </Caption>
+            </View>
+          }
+          ListFooterComponent={
+            navigation ? (
+              <Button
+                style={{margin: 10}}
+                mode="text"
+                onPress={() => navigation.navigate('Home')}>
+                Browse
+              </Button>
+            ) : null
+          }
+        />
+      </View>
       <Portal>
-        <Dialog visible={!!confirming} onDismiss={() => setConfirming(null)}>
+        <Dialog
+          visible={!!confirming}
+          onDismiss={() => setConfirming(null)}
+          style={{ maxWidth: 500, width: '90%', alignSelf: 'center' }}>
           <Dialog.Title>Delete download?</Dialog.Title>
           <Dialog.Content>
             <Text>
@@ -418,7 +432,7 @@ const DownloadsScreen = ({navigation}) => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </>
+    </View>
   );
 };
 

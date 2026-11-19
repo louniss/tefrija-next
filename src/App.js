@@ -1,12 +1,18 @@
 import * as React from 'react';
 import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {createDrawerNavigator} from '@react-navigation/drawer';
+import {
+  createDrawerNavigator,
+  DrawerContentScrollView,
+  DrawerItemList,
+} from '@react-navigation/drawer';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {IconButton, Text} from 'react-native-paper';
 import {DefaultTheme, DarkTheme, useNavigation} from '@react-navigation/native';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
-import {useColorScheme, View} from 'react-native';
+import {useColorScheme, View, StyleSheet, LogBox} from 'react-native';
+
+LogBox.ignoreLogs(['Iconv-lite warning', 'Render Error: Should have a queue']);
 
 import {MainScreen} from './screens/MainScreen';
 import SearchScreen from './screens/SearchScreen';
@@ -24,6 +30,7 @@ import DownloadsScreen from './screens/DownloadsScreen';
 import {WebFetchHost} from './stream/webFetch';
 import {DownloadHost} from './stream/DownloadHost';
 import {ensureStreamServer} from './stream/server';
+import useResponsive from './utils/useResponsive';
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -40,7 +47,7 @@ const InitialHome = () => {
       <Stack.Screen name="PopularMovies" component={PopularMoviesScreen} />
       <Stack.Screen name="TopRatedMovies" component={TopRatedMoviesScreen} />
       <Stack.Screen name="TopRatedShows" component={TopRatedShowsScreen} />
-        <Stack.Screen name="MoviesShowsByGenre" component={MoviesShowsByGenre} />
+      <Stack.Screen name="MoviesShowsByGenre" component={MoviesShowsByGenre} />
       <Stack.Screen
         name="VideoPlayerEmbed"
         component={VideoPlayer}
@@ -52,44 +59,55 @@ const InitialHome = () => {
   );
 };
 
-const HomeHeaderRight = () => {
-  const navigation = useNavigation();
+const CustomDrawerContent = props => {
   return (
-    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-      <CastButton style={{ width: 24, height: 24, marginRight: 10 }} />
-      <IconButton
-        icon="magnify"
-        size={20}
-        onPress={() => {
-          navigation.navigate('Search');
-        }}
-      />
-    </View>
+    <DrawerContentScrollView {...props} contentContainerStyle={{paddingTop: 8}}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: 'rgba(150,150,150,0.3)',
+          marginBottom: 8,
+        }}>
+        <IconButton icon="movie-outline" size={24} style={{margin: 0, marginRight: 6}} />
+        <Text style={{fontSize: 20, fontWeight: 'bold'}}>Tefrija</Text>
+      </View>
+      <DrawerItemList {...props} />
+    </DrawerContentScrollView>
   );
 };
 
 const Main = () => {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
+  const {isTabletLandscape} = useResponsive();
+
   return (
     <SafeAreaProvider>
       <Drawer.Navigator
+        drawerContent={props => <CustomDrawerContent {...props} />}
         screenOptions={({navigation}) => ({
+          drawerType: isTabletLandscape ? 'permanent' : 'front',
           drawerStyle: {
-            width: 200,
+            width: 220,
           },
-
-          headerLeft: () => (
-            <IconButton
-              icon="menu"
-              size={20}
-              onPress={() => navigation.openDrawer()}
-            />
-          ),
+          headerLeft: isTabletLandscape
+            ? () => null
+            : () => (
+                <IconButton
+                  icon="menu"
+                  size={20}
+                  onPress={() => navigation.openDrawer()}
+                />
+              ),
         })}>
         <Drawer.Screen
           name="Home"
           options={{
+            headerShown: false,
             title: 'Tefrija',
             drawerLabel: 'Popular',
             drawerIcon: () => (
@@ -99,32 +117,14 @@ const Main = () => {
                 style={{padding: 0, margin: 0}}
               />
             ),
-            headerTitleStyle: {
-              width: 500,
-            },
-
-            headerRight: () => {
-              const navigation = useNavigation();
-              return (
-                <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                  <IconButton
-                    icon="magnify"
-                    size={20}
-                    onPress={() => {
-                      navigation.navigate('Search');
-                    }}
-                  />
-                </View>
-              );
-            },
           }}
           component={InitialHome}
         />
         <Drawer.Screen
           name="Search"
           options={{
-              title: 'Search',
-              headerShown: false,
+            title: 'Search',
+            headerShown: false,
             drawerLabel: 'Search',
             drawerIcon: () => (
               <IconButton
@@ -133,22 +133,6 @@ const Main = () => {
                 style={{padding: 0, margin: 0}}
               />
             ),
-            headerTitleStyle: {
-              width: 500,
-            },
-
-            headerRight: () => {
-              const navigation = useNavigation();
-              return (
-                <IconButton
-                  icon="magnify"
-                  size={20}
-                  onPress={() => {
-                    navigation.navigate('Search');
-                  }}
-                />
-              );
-            },
           }}
           component={SearchScreen}
         />

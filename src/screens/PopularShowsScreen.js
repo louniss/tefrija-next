@@ -1,11 +1,12 @@
 import * as React from 'react';
-import {View, Image, ScrollView, Pressable} from 'react-native';
+import {View, Image, Pressable} from 'react-native';
 import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
 import useMainState from '../state/Main';
-import {Button, Headline, IconButton, Paragraph, Text} from 'react-native-paper';
+import {Headline, IconButton, Text} from 'react-native-paper';
+import useResponsive from '../utils/useResponsive';
 
 const PopularShowsScreen = () => {
   const [series, setSeries] = React.useState([]);
@@ -13,19 +14,21 @@ const PopularShowsScreen = () => {
 
   const state = useMainState();
   const navigation = useNavigation();
+  const {isTablet} = useResponsive();
+
+  const mapShow = item => ({
+    id: item.id,
+    title: item.name,
+    image: item.poster_path
+      ? `https://image.tmdb.org/t/p/w500/${item.poster_path}`
+      : `https://image.tmdb.org/t/p/w500/${item.backdrop_path}`,
+    year: item.first_air_date ? item.first_air_date.split('-')[0] : '',
+  });
 
   React.useEffect(() => {
     const s = moviedb.discoverTv({sort_by: 'popularity.desc', page: page});
     s.then(res => {
-      const s = res.results.map(item => {
-        return {
-          id: item.id,
-          title: item.name,
-          image: `https://image.tmdb.org/t/p/w500/${item.backdrop_path}`,
-          year: item.first_air_date.split('-')[0],
-        };
-      });
-
+      const s = (res.results || []).map(mapShow);
       setSeries(s);
     });
   }, []);
@@ -35,40 +38,40 @@ const PopularShowsScreen = () => {
       sort_by: 'popularity.desc',
       page: page + 1,
     });
-    const newSeries = s.results.map(item => {
-      return {
-        id: item.id,
-        title: item.name,
-        image: `https://image.tmdb.org/t/p/w500/${item.backdrop_path}`,
-        year: item.first_air_date.split('-')[0],
-      };
-    });
+    const newSeries = (s.results || []).map(mapShow);
 
     setSeries([...series, ...newSeries]);
     setPage(page + 1);
   };
 
   return (
-    <>
-      <View style={{padding: 1, flexDirection: 'row', alignItems: 'center'}}>
-        <Button icon="chevron-left" onPress={() => navigation.goBack()}>
-          back
-        </Button>
-        <Paragraph>Popular Shows</Paragraph>
+    <View style={{flex: 1}}>
+      <View
+        style={{
+          paddingHorizontal: isTablet ? 16 : 8,
+          paddingVertical: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}>
+        <IconButton icon="arrow-left" size={24} onPress={() => navigation.goBack()} />
+        <Headline style={{fontSize: isTablet ? 24 : 18, fontWeight: 'bold', marginLeft: 4}}>
+          Popular Series
+        </Headline>
       </View>
       <FlatGrid
         onEndReached={fetchMore}
-        itemDimension={120}
+        itemDimension={isTablet ? 180 : 120}
         data={series}
-        spacing={10}
-        renderItem={({item}) => <RenderCard item={{...item, type: 'tv'}} />}
+        spacing={isTablet ? 14 : 10}
+        renderItem={({item}) => <RenderCard item={{...item, type: 'tv'}} isTablet={isTablet} />}
       />
-    </>
+    </View>
   );
 };
 
-const RenderCard = ({item}) => {
+const RenderCard = ({item, isTablet}) => {
   const navigation = useNavigation();
+  const imageHeight = isTablet ? 260 : 200;
 
   return (
     <Pressable
@@ -78,24 +81,28 @@ const RenderCard = ({item}) => {
       <View
         style={{
           borderWidth: 1,
-          borderRadius: 5,
+          borderRadius: 8,
           borderColor: 'rgba(153, 153, 153, 0.2)',
-          justifyContent: 'center',
+          overflow: 'hidden',
         }}>
         <Image
           source={{
             uri: item.image,
           }}
-          style={{width: '100%', height: 200, borderRadius: 5}}
+          style={{width: '100%', height: imageHeight, borderTopLeftRadius: 7, borderTopRightRadius: 7}}
+          resizeMode="cover"
         />
-        <Text
-          style={{
-            padding: 5,
-            textAlign: 'center',
-            height: 50,
-          }}>
-          {item.title} ({item.year})
-        </Text>
+        <View style={{padding: 6, height: 48, justifyContent: 'center'}}>
+          <Text
+            numberOfLines={2}
+            style={{
+              textAlign: 'center',
+              fontSize: 13,
+              lineHeight: 18,
+            }}>
+            {item.title} {item.year ? `(${item.year})` : ''}
+          </Text>
+        </View>
       </View>
     </Pressable>
   );
