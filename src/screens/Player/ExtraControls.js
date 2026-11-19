@@ -4,7 +4,6 @@ import {
   StyleSheet,
   useColorScheme,
   Animated,
-  TouchableWithoutFeedback,
   useWindowDimensions,
   Pressable,
   ScrollView,
@@ -369,17 +368,20 @@ const ExtraControls = ({
 
   return (
     <View style={styles.container}>
-      {/* Background touchable for tap / double tap */}
-      <TouchableWithoutFeedback
+      {/* Tap layer under the controls: taps on the empty picture area fall
+       * through the box-none overlay to here, and while the controls are faded
+       * out it is the only thing left that can bring them back. It stays
+       * mounted so that never depends on a re-render. */}
+      <Pressable
+        style={StyleSheet.absoluteFill}
         onPress={event => {
           if (isLocked) {
             showUnlockButton();
           } else {
             handleScreenPress(event);
           }
-        }}>
-        <View style={StyleSheet.absoluteFillObject} />
-      </TouchableWithoutFeedback>
+        }}
+      />
 
       {/* Unlock button when locked */}
       <Animated.View
@@ -401,10 +403,7 @@ const ExtraControls = ({
       {/* Main Overlay Controls */}
       <Animated.View
         pointerEvents={controlsVisible && !isLocked ? 'box-none' : 'none'}
-        style={[
-          styles.overlayContainer,
-          {opacity: fadeAnim, display: controlsVisible && !isLocked ? 'flex' : 'none'},
-        ]}>
+        style={[styles.overlayContainer, {opacity: fadeAnim}]}>
         {/* Top Header Bar */}
         <View style={styles.topBar} pointerEvents="box-none">
           <IconButton
@@ -589,7 +588,7 @@ const ExtraControls = ({
       {showAudioSubModal && (
         <View style={styles.modalCenteredOverlay}>
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             onPress={() => setShowAudioSubModal(false)}
           />
           <View style={[styles.audioSubCard, {maxWidth: isTablet ? 560 : 480}]}>
@@ -721,7 +720,7 @@ const ExtraControls = ({
       {showEpisodesPanel && (
         <View style={styles.modalOverlay}>
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             onPress={() => setShowEpisodesPanel(false)}
           />
           <View style={[styles.episodesDrawer, {width: isTablet ? 480 : 380}]}>
@@ -837,7 +836,7 @@ const ExtraControls = ({
       {showSpeedMenu && (
         <View style={styles.modalCenteredOverlay}>
           <TouchableOpacity
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
             onPress={() => setShowSpeedMenu(false)}
           />
           <View style={styles.speedCard}>
@@ -874,16 +873,6 @@ const ExtraControls = ({
           <WebView source={{uri: adUrl}} style={{width: 1, height: 1}} />
         </View>
       )}
-
-      {/* With the overlay hidden there is nothing interactive left to catch a
-       * tap, so the picture needs its own layer — without it the controls never
-       * came back once they auto-hid. */}
-      {!controlsVisible && !isLocked ? (
-        <Pressable
-          style={StyleSheet.absoluteFillObject}
-          onPress={handleScreenPress}
-        />
-      ) : null}
     </View>
   );
 };
