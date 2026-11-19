@@ -157,9 +157,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 /* The CDN starts answering 403 when chunks are pulled too fast; waiting and
  * asking again is what turns that into a slow download instead of a failure. */
 const RETRY_DELAYS_MS = [5000, 15000, 30000];
-/* Chunks are small; three at a time keeps a download moving without looking
- * like a burst to the CDN's rate limiting. */
-const DOWNLOAD_WORKERS = 3;
+/* Chunks are small and the CDN tolerates parallel reads; eight at a time keeps
+ * a long episode moving without hammering it. */
+const DOWNLOAD_WORKERS = 8;
 const isThrottled = error =>
   !error.status || error.status === 403 || error.status === 429 || error.status >= 500;
 
@@ -526,6 +526,10 @@ export const downloadStream = async (record, variantIndex) => {
   store.setDownload(record.key, {status: 'completed', done: total, total});
   const finished = {
     ...record,
+    // Every chunk is here now, including ones a previous attempt had to skip.
+    variants: record.variants.map((item, index) =>
+      index === variantIndex ? {...item, missing: []} : item,
+    ),
     downloadedVariant: variantIndex,
     downloadedAt: Date.now(),
   };

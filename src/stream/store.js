@@ -116,7 +116,9 @@ const useStreamStore = create(
       /** Stops a running download but keeps what already arrived. */
       pauseDownload(key) {
         const current = get().downloads[key];
-        if (!current || current.status !== 'downloading') {
+        // A queued item has not started yet, but pausing it must work too: the
+        // row shows the same pause affordance while it waits.
+        if (!current || (current.status !== 'downloading' && current.status !== 'queued')) {
           return;
         }
         set(state => ({
@@ -162,6 +164,8 @@ const useStreamStore = create(
           total: 0,
           error: null,
           skipped: 0,
+          // Fixed at queue time so the list never reorders while it downloads.
+          createdAt: (existing && existing.createdAt) || Date.now(),
         });
       },
     }),

@@ -69,6 +69,12 @@ const buildGroups = items => {
     }
     const group = groups.get(id);
     group.episodes.push(item);
+    // Order is fixed when a download is added; progress updates must not
+    // reshuffle the list under the user's finger.
+    group.createdAt = Math.min(
+      group.createdAt == null ? Infinity : group.createdAt,
+      item.createdAt || item.updatedAt || 0,
+    );
     // The show's name belongs to the show, not to the row that happens to sort
     // first: take it from the most recent entry, so a stale title on an old
     // episode cannot title the whole group.
@@ -88,7 +94,7 @@ const buildGroups = items => {
           (a.season || 0) - (b.season || 0) || (a.episode || 0) - (b.episode || 0),
       ),
     }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+    .sort((a, b) => b.createdAt - a.createdAt);
 };
 
 /**
@@ -160,8 +166,8 @@ const RowActions = ({item, onPause, onResume, onDelete, theme}) => (
       <Action icon="pause" label="Pause" onPress={onPause} />
     ) : item.status === 'paused' || item.status === 'error' ? (
       <Action
-        icon="play-circle-outline"
-        label="Resume"
+        icon="download"
+        label="Resume download"
         onPress={onResume}
         color={theme.colors.primary}
       />
@@ -282,8 +288,8 @@ const SerieCard = ({
                 item={item}
                 theme={theme}
                 onPlay={() => onPlay(item)}
-                onPause={() => onPause(item)}
-                onResume={() => onResume(item)}
+                onPause={() => onPause(item.key)}
+                onResume={() => onResume(item.key)}
                 onDelete={() => onDelete(item)}
               />
             </View>
