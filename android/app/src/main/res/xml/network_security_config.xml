@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The player reads its stream from a loopback HTTP server started by the app
+  (see src/stream/server.js), so 127.0.0.1 must stay cleartext.
+
+  Release builds otherwise forbid cleartext (React Native's gradle plugin sets
+  android:usesCleartextTraffic="false"), which made playback fail with
+  "CLEARTEXT communication to 127.0.0.1 not permitted by network security
+  policy" while downloads still worked — those go through the WebView over
+  https and never touch the app's own HTTP stack.
+
+  Everything else stays https-only, and this file takes precedence over
+  android:usesCleartextTraffic.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>
