@@ -11,11 +11,14 @@ import {
   Subheading,
   Text,
   useTheme,
+  Headline,
+  IconButton,
 } from 'react-native-paper';
 
 import useStreamStore, {sortDownloads} from '../stream/store';
 import {clearStreamFiles} from '../stream/manager';
 import useResponsive from '../utils/useResponsive';
+import MobileBottomNav from '../components/MobileBottomNav';
 
 const percentOf = item =>
   item.total ? Math.min(100, Math.round((item.done / item.total) * 100)) : 0;
@@ -102,7 +105,7 @@ const buildGroups = items => {
  * Small square touch target: the default `IconButton` reserves ~72dp each,
  * which left no room for the episode title.
  */
-const Action = ({icon, onPress, label, color}) => (
+const Action = ({icon, onPress, label, color = 'rgba(255,255,255,0.7)'}) => (
   <TouchableOpacity
     accessibilityLabel={label}
     accessibilityRole="button"
@@ -164,16 +167,16 @@ const PlayThumbnail = ({uri, onPlay, width, height, radius = 6}) => (
 const RowActions = ({item, onPause, onResume, onDelete, theme}) => (
   <View style={{flexDirection: 'row', alignItems: 'center', marginLeft: 6}}>
     {isRunning(item) ? (
-      <Action icon="pause" label="Pause" onPress={onPause} />
+      <Action icon="pause" label="Pause" onPress={onPause} color="#ffffff" />
     ) : item.status === 'paused' || item.status === 'error' ? (
       <Action
         icon="download"
         label="Resume download"
         onPress={onResume}
-        color={theme.colors.primary}
+        color="#E50914"
       />
     ) : null}
-    <Action icon="delete-outline" label="Delete" onPress={onDelete} />
+    <Action icon="delete-outline" label="Delete" onPress={onDelete} color="rgba(255,255,255,0.7)" />
   </View>
 );
 
@@ -189,15 +192,15 @@ const EpisodeRow = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
       />
     </View>
     <View style={{flex: 1}}>
-      <Text numberOfLines={1} style={{fontSize: 13}}>
+      <Text numberOfLines={1} style={{fontSize: 13, color: '#ffffff', fontWeight: '500'}}>
         {episodeLabel(item)} {item.episodeTitle || ''}
       </Text>
-      <Caption numberOfLines={1} style={{fontSize: 11}}>
+      <Caption numberOfLines={1} style={{fontSize: 11, color: 'rgba(255,255,255,0.6)'}}>
         {statusLabel(item)}
       </Caption>
       <ProgressBar
         progress={item.status === 'completed' ? 1 : percentOf(item) / 100}
-        color={item.status === 'error' ? theme.colors.error : undefined}
+        color={item.status === 'error' ? '#ff5252' : '#E50914'}
         style={{height: 3, borderRadius: 2}}
       />
     </View>
@@ -212,16 +215,16 @@ const EpisodeRow = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
 );
 
 const MovieCard = ({item, theme, onPlay, onPause, onResume, onDelete}) => (
-  <Card style={{margin: 5}}>
+  <Card style={{margin: 6, backgroundColor: '#1e1e1e', borderRadius: 10, borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1}}>
     <View style={{flexDirection: 'row', padding: 8}}>
       <PlayThumbnail uri={item.poster} onPlay={onPlay} width={60} height={90} />
       <View style={{flex: 1, paddingLeft: 10, justifyContent: 'center'}}>
-        <Subheading numberOfLines={2}>{item.title || item.key}</Subheading>
-        {item.year ? <Caption>{item.year}</Caption> : null}
-        <Text style={{fontSize: 12, paddingBottom: 6}}>{statusLabel(item)}</Text>
+        <Subheading numberOfLines={2} style={{color: '#ffffff', fontWeight: 'bold'}}>{item.title || item.key}</Subheading>
+        {item.year ? <Caption style={{color: 'rgba(255,255,255,0.6)'}}>{item.year}</Caption> : null}
+        <Text style={{fontSize: 12, paddingBottom: 6, color: item.status === 'error' ? '#ff5252' : 'rgba(255,255,255,0.8)'}}>{statusLabel(item)}</Text>
         <ProgressBar
           progress={item.status === 'completed' ? 1 : percentOf(item) / 100}
-          color={item.status === 'error' ? theme.colors.error : undefined}
+          color={item.status === 'error' ? '#ff5252' : '#E50914'}
           style={{height: 3, borderRadius: 2}}
         />
       </View>
@@ -256,7 +259,7 @@ const SerieCard = ({
   );
 
   return (
-    <Card style={{margin: 5}}>
+    <Card style={{margin: 6, backgroundColor: '#1e1e1e', borderRadius: 10, borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1}}>
       <TouchableOpacity
         onPress={onToggle}
         accessibilityRole="button"
@@ -268,18 +271,19 @@ const SerieCard = ({
           />
         ) : null}
         <View style={{flex: 1, paddingLeft: 10}}>
-          <Subheading numberOfLines={2}>{group.title}</Subheading>
-          <Caption>
+          <Subheading numberOfLines={2} style={{color: '#ffffff', fontWeight: 'bold'}}>{group.title}</Subheading>
+          <Caption style={{color: 'rgba(255,255,255,0.6)'}}>
             {downloaded} of {group.episodes.length} episode
             {group.episodes.length === 1 ? '' : 's'} downloaded
           </Caption>
           <ProgressBar
             progress={overall / group.episodes.length}
+            color="#E50914"
             style={{height: 3, borderRadius: 2}}
           />
         </View>
         <View style={{width: 34, alignItems: 'center'}}>
-          <Icon source={isOpen ? 'chevron-up' : 'chevron-down'} size={22} />
+          <Icon source={isOpen ? 'chevron-up' : 'chevron-down'} size={22} color="#ffffff" />
         </View>
       </TouchableOpacity>
       {isOpen
@@ -369,7 +373,27 @@ const DownloadsScreen = ({navigation}) => {
     );
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#121212' }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: isTablet ? 16 : 8,
+          paddingVertical: 8,
+        }}>
+        <IconButton
+          icon="arrow-left"
+          iconColor="#fff"
+          size={24}
+          onPress={() => {
+            if (navigation && navigation.canGoBack()) navigation.goBack();
+            else if (navigation) navigation.navigate('Home');
+          }}
+        />
+        <Headline style={{fontSize: isTablet ? 24 : 20, fontWeight: 'bold', color: '#fff', marginLeft: 4}}>
+          Downloads
+        </Headline>
+      </View>
       <View
         style={{
           flex: 1,
@@ -396,6 +420,7 @@ const DownloadsScreen = ({navigation}) => {
               <Button
                 style={{margin: 10}}
                 mode="text"
+                textColor="#E50914"
                 onPress={() => navigation.navigate('Home')}>
                 Browse
               </Button>
@@ -403,6 +428,7 @@ const DownloadsScreen = ({navigation}) => {
           }
         />
       </View>
+      <MobileBottomNav activeTab="downloads" />
       <Portal>
         <Dialog
           visible={!!confirming}

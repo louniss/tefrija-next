@@ -1,24 +1,25 @@
 import * as React from 'react';
-import {View, Image, Pressable} from 'react-native';
+import {View} from 'react-native';
 import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
-import useMainState from '../state/Main';
-import {Headline, IconButton, Text} from 'react-native-paper';
+import {Headline, IconButton} from 'react-native-paper';
 import useResponsive from '../utils/useResponsive';
+import MediaCard from '../components/MediaCard';
 
 const TopRatedShowsScreen = () => {
   const [series, setSeries] = React.useState([]);
   const [page, setPage] = React.useState(1);
 
-  const state = useMainState();
   const navigation = useNavigation();
   const {isTablet} = useResponsive();
 
   const mapShow = item => ({
     id: item.id,
     title: item.name,
+    poster_path: item.poster_path,
+    vote_average: item.vote_average,
     image: item.poster_path
       ? `https://image.tmdb.org/t/p/w500/${item.poster_path}`
       : `https://image.tmdb.org/t/p/w500/${item.backdrop_path}`,
@@ -44,7 +45,7 @@ const TopRatedShowsScreen = () => {
   };
 
   return (
-    <View style={{flex: 1}}>
+    <View style={{flex: 1, backgroundColor: '#121212'}}>
       <View
         style={{
           paddingHorizontal: isTablet ? 16 : 8,
@@ -52,58 +53,19 @@ const TopRatedShowsScreen = () => {
           flexDirection: 'row',
           alignItems: 'center',
         }}>
-        <IconButton icon="arrow-left" size={24} onPress={() => navigation.goBack()} />
-        <Headline style={{fontSize: isTablet ? 24 : 18, fontWeight: 'bold', marginLeft: 4}}>
+        <IconButton icon="arrow-left" iconColor="#fff" size={24} onPress={() => navigation.goBack()} />
+        <Headline style={{fontSize: isTablet ? 24 : 18, fontWeight: 'bold', marginLeft: 4, color: '#fff'}}>
           Top Rated Series
         </Headline>
       </View>
       <FlatGrid
         onEndReached={fetchMore}
-        itemDimension={isTablet ? 180 : 120}
+        itemDimension={isTablet ? 180 : 130}
         data={series}
-        spacing={isTablet ? 14 : 10}
-        renderItem={({item}) => <RenderCard item={{...item, type: 'tv'}} isTablet={isTablet} />}
+        spacing={isTablet ? 14 : 8}
+        renderItem={({item}) => <MediaCard item={{...item, type: 'tv'}} isTablet={isTablet} />}
       />
     </View>
-  );
-};
-
-const RenderCard = ({item, isTablet}) => {
-  const navigation = useNavigation();
-  const imageHeight = isTablet ? 260 : 200;
-
-  return (
-    <Pressable
-      onPress={() => {
-        navigation.navigate('SerieDetail', {serie: item});
-      }}>
-      <View
-        style={{
-          borderWidth: 1,
-          borderRadius: 8,
-          borderColor: 'rgba(153, 153, 153, 0.2)',
-          overflow: 'hidden',
-        }}>
-        <Image
-          source={{
-            uri: item.image,
-          }}
-          style={{width: '100%', height: imageHeight, borderTopLeftRadius: 7, borderTopRightRadius: 7}}
-          resizeMode="cover"
-        />
-        <View style={{padding: 6, height: 48, justifyContent: 'center'}}>
-          <Text
-            numberOfLines={2}
-            style={{
-              textAlign: 'center',
-              fontSize: 13,
-              lineHeight: 18,
-            }}>
-            {item.title} {item.year ? `(${item.year})` : ''}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
   );
 };
 

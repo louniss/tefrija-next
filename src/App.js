@@ -1,20 +1,20 @@
 import * as React from 'react';
-import {NavigationContainer} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
   DrawerItemList,
 } from '@react-navigation/drawer';
-import {SafeAreaProvider} from 'react-native-safe-area-context';
-import {IconButton, Text} from 'react-native-paper';
-import {DefaultTheme, DarkTheme, useNavigation} from '@react-navigation/native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { IconButton, Text } from 'react-native-paper';
+import { DefaultTheme, DarkTheme, useNavigation } from '@react-navigation/native';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
-import {useColorScheme, View, StyleSheet, LogBox} from 'react-native';
+import { useColorScheme, View, StyleSheet, LogBox } from 'react-native';
 
 LogBox.ignoreLogs(['Iconv-lite warning', 'Render Error: Should have a queue']);
 
-import {MainScreen} from './screens/MainScreen';
+import { MainScreen } from './screens/MainScreen';
 import SearchScreen from './screens/SearchScreen';
 import MovieDetail from './screens/MovieDetail';
 import SerieDetails from './screens/SerieDetail';
@@ -27,9 +27,9 @@ import TopRatedMoviesScreen from './screens/TopRatedMoviesScreen';
 import TopRatedShowsScreen from './screens/TopRatedShowsScreen';
 import MoviesShowsByGenre from './screens/MoviesShowsByGenre';
 import DownloadsScreen from './screens/DownloadsScreen';
-import {WebFetchHost} from './stream/webFetch';
-import {DownloadHost} from './stream/DownloadHost';
-import {ensureStreamServer} from './stream/server';
+import { WebFetchHost } from './stream/webFetch';
+import { DownloadHost } from './stream/DownloadHost';
+import { ensureStreamServer } from './stream/server';
 import useResponsive from './utils/useResponsive';
 
 const Stack = createNativeStackNavigator();
@@ -39,7 +39,7 @@ const InitialHome = () => {
   SystemNavigationBar.navigationShow();
 
   return (
-    <Stack.Navigator screenOptions={{headerShown: false}}>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={MainScreen} />
       <Stack.Screen name="MovieDetail" component={MovieDetail} />
       <Stack.Screen name="SerieDetail" component={SerieDetails} />
@@ -61,19 +61,19 @@ const InitialHome = () => {
 
 const CustomDrawerContent = props => {
   return (
-    <DrawerContentScrollView {...props} contentContainerStyle={{paddingTop: 8}}>
+    <DrawerContentScrollView {...props} contentContainerStyle={{paddingTop: 8, flex: 1, backgroundColor: '#181818'}}>
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingVertical: 14,
           borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: 'rgba(150,150,150,0.3)',
+          borderBottomColor: 'rgba(255,255,255,0.1)',
           marginBottom: 8,
         }}>
-        <IconButton icon="movie-outline" size={24} style={{margin: 0, marginRight: 6}} />
-        <Text style={{fontSize: 20, fontWeight: 'bold'}}>Tefrija</Text>
+        <IconButton icon="movie-outline" iconColor="#E50914" size={26} style={{margin: 0, marginRight: 8}} />
+        <Text style={{fontSize: 20, fontWeight: '900', color: '#E50914', letterSpacing: 1}}>TEFRIJA</Text>
       </View>
       <DrawerItemList {...props} />
     </DrawerContentScrollView>
@@ -83,22 +83,35 @@ const CustomDrawerContent = props => {
 const Main = () => {
   const colorScheme = useColorScheme();
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme;
-  const {isTabletLandscape} = useResponsive();
+  const { isTabletLandscape } = useResponsive();
 
   return (
     <SafeAreaProvider>
       <Drawer.Navigator
         drawerContent={props => <CustomDrawerContent {...props} />}
-        screenOptions={({navigation}) => ({
+        screenOptions={({ navigation }) => ({
+          headerShown: false,
           drawerType: isTabletLandscape ? 'permanent' : 'front',
           drawerStyle: {
             width: 220,
+            backgroundColor: '#181818',
+            borderRightWidth: isTabletLandscape ? 1 : 0,
+            borderRightColor: 'rgba(255,255,255,0.08)',
+          },
+          drawerActiveTintColor: '#E50914',
+          drawerInactiveTintColor: '#aaaaaa',
+          drawerActiveBackgroundColor: 'rgba(229, 9, 20, 0.15)',
+          drawerItemStyle: {
+            borderRadius: 8,
+            marginHorizontal: 8,
+            marginVertical: 2,
           },
           headerLeft: isTabletLandscape
             ? () => null
             : () => (
                 <IconButton
                   icon="menu"
+                  iconColor="#ffffff"
                   size={20}
                   onPress={() => navigation.openDrawer()}
                 />
@@ -109,12 +122,13 @@ const Main = () => {
           options={{
             headerShown: false,
             title: 'Tefrija',
-            drawerLabel: 'Popular',
-            drawerIcon: () => (
+            drawerLabel: 'Home',
+            drawerIcon: ({color}) => (
               <IconButton
                 icon="home"
+                iconColor={color}
                 size={20}
-                style={{padding: 0, margin: 0}}
+                style={{ padding: 0, margin: 0 }}
               />
             ),
           }}
@@ -126,11 +140,12 @@ const Main = () => {
             title: 'Search',
             headerShown: false,
             drawerLabel: 'Search',
-            drawerIcon: () => (
+            drawerIcon: ({color}) => (
               <IconButton
                 icon="magnify"
+                iconColor={color}
                 size={20}
-                style={{padding: 0, margin: 0}}
+                style={{ padding: 0, margin: 0 }}
               />
             ),
           }}
@@ -141,11 +156,12 @@ const Main = () => {
           options={{
             title: 'Downloads',
             drawerLabel: 'Downloads',
-            drawerIcon: () => (
+            drawerIcon: ({color}) => (
               <IconButton
                 icon="download"
+                iconColor={color}
                 size={20}
-                style={{padding: 0, margin: 0}}
+                style={{ padding: 0, margin: 0 }}
               />
             ),
           }}
@@ -156,11 +172,12 @@ const Main = () => {
           options={{
             title: 'Updates',
             drawerLabel: 'Version',
-            drawerIcon: () => (
+            drawerIcon: ({color}) => (
               <IconButton
                 icon="update"
-                size={15}
-                style={{padding: 0, margin: 0}}
+                iconColor={color}
+                size={18}
+                style={{ padding: 0, margin: 0 }}
               />
             ),
           }}
@@ -173,11 +190,12 @@ const Main = () => {
           options={{
             title: 'About',
             drawerLabel: 'About',
-            drawerIcon: () => (
+            drawerIcon: ({color}) => (
               <IconButton
                 icon="information"
-                size={15}
-                style={{padding: 0, margin: 0}}
+                iconColor={color}
+                size={18}
+                style={{ padding: 0, margin: 0 }}
               />
             ),
           }}
@@ -206,7 +224,7 @@ const App = () => {
       <RootStack.Navigator
         mode="card"
         headerMode="none"
-        screenOptions={{headerShown: false}}>
+        screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="Main" component={Main} />
         <RootStack.Screen name="VideoPlayer" component={VideoPlayer} />
       </RootStack.Navigator>

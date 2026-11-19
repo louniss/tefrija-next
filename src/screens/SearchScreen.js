@@ -1,13 +1,15 @@
-import { Image, Pressable, ScrollView, View } from 'react-native';
-import React, { Component } from 'react';
+import { Pressable, View } from 'react-native';
+import React from 'react';
 import { jsdom } from 'jsdom-jscore-rn';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Appbar, Badge, Text, IconButton, ActivityIndicator } from 'react-native-paper';
+import { Text, IconButton, ActivityIndicator } from 'react-native-paper';
 import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
 import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import useResponsive from '../utils/useResponsive';
+import MediaCard from '../components/MediaCard';
+import MobileBottomNav from '../components/MobileBottomNav';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
 const SearchScreen = () => {
@@ -62,12 +64,14 @@ const SearchScreen = () => {
           if (item.media_type === 'person') {
             return false;
           }
-          const backdrop = item.backdrop_path || item.poster_path || null;
+          const poster = item.poster_path || item.backdrop_path || null;
           return {
             id: item.id,
             title: item.title || item.name,
-            image: backdrop
-              ? `https://image.tmdb.org/t/p/w500/${backdrop}`
+            poster_path: item.poster_path,
+            vote_average: item.vote_average,
+            image: poster
+              ? `https://image.tmdb.org/t/p/w500/${poster}`
               : 'https://t3.ftcdn.net/jpg/02/68/55/60/360_F_268556012_c1WBaKFN5rjRxR2eyV33znK4qnYeKZjm.jpg',
             type: item.media_type,
             year:
@@ -201,7 +205,8 @@ const SearchScreen = () => {
   };
 
   return (
-    <SafeAreaView style={{ paddingBottom: 50, flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#121212' }} edges={['top', 'left', 'right']}>
+      <View style={{ flex: 1 }}>
       <View
         style={{
           flexDirection: 'row',
@@ -212,15 +217,15 @@ const SearchScreen = () => {
           alignSelf: 'center',
         }}>
         <IconButton
-          icon="home"
+          icon="arrow-left"
+          iconColor="#fff"
           size={24}
           onPress={() => {
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-              }),
-            );
+            if (navigation.canGoBack()) {
+              navigation.goBack();
+            } else {
+              navigation.navigate('Home');
+            }
           }}
           style={{ margin: 0 }}
         />
@@ -266,27 +271,27 @@ const SearchScreen = () => {
               await Promise.all([search(reset, 1, suggestion), fetchSuggestion(suggestion)]);
             }}
             style={{ padding: 8 }}>
-            <Text style={{ color: '#666' }}>See also <Text style={{ color: '#1a73e8' }}>{suggestion}</Text>?</Text>
+            <Text style={{ color: '#aaa' }}>See also <Text style={{ color: '#E50914', fontWeight: 'bold' }}>{suggestion}</Text>?</Text>
           </Pressable>
         </View>
       ) : null}
       {searchQuery.trim().length === 0 ? (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
+          <Text style={{ fontSize: 16, color: '#888', textAlign: 'center' }}>
             Start typing to search movies and shows
           </Text>
         </View>
       ) : searchLoading ? (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator animating={true} />
+          <ActivityIndicator animating={true} color="#E50914" />
         </View>
       ) : hasSearched && searchResults.length === 0 ? (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
           {suggestionLoading ? (
-            <ActivityIndicator animating={true} />
+            <ActivityIndicator animating={true} color="#E50914" />
           ) : suggestion ? (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', marginBottom: 8 }}>
+              <Text style={{ fontSize: 16, color: '#aaa', textAlign: 'center', marginBottom: 8 }}>
                 Did you mean:
               </Text>
               <Pressable
@@ -300,9 +305,9 @@ const SearchScreen = () => {
                   await search(reset, 1, suggestion);
                 }}
                 style={{ padding: 8 }}>
-                <Text style={{ fontSize: 18, color: '#1a73e8' }}>{suggestion}</Text>
+                <Text style={{ fontSize: 18, color: '#E50914', fontWeight: 'bold' }}>{suggestion}</Text>
               </Pressable>
-              <Text style={{ fontSize: 14, color: '#666', marginTop: 12 }}>
+              <Text style={{ fontSize: 14, color: '#888', marginTop: 12 }}>
                 Or search for "{searchQuery}" anyway
               </Text>
               <Pressable
@@ -315,12 +320,12 @@ const SearchScreen = () => {
                   await search(reset, 1, searchQuery);
                 }}
                 style={{ padding: 8 }}>
-                <Text style={{ color: '#666' }}>Search</Text>
+                <Text style={{ color: '#aaa' }}>Search</Text>
               </Pressable>
             </View>
           ) : (
             <View>
-              <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
+              <Text style={{ fontSize: 16, color: '#888', textAlign: 'center' }}>
                 No results for "{searchQuery}".
               </Text>
             </View>
@@ -346,75 +351,33 @@ const SearchScreen = () => {
               return next;
             });
           }}
-          renderItem={({ item }) => {
-            return <RenderCard item={item} isTablet={isTablet} />;
-          }}
-          itemDimension={isTablet ? 180 : 160}
-          spacing={isTablet ? 14 : 10}
+          renderItem={({ item }) => (
+            <MediaCard
+              item={item}
+              isTablet={isTablet}
+              onPress={() => {
+                if (item.type === 'movie') {
+                  navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
+                } else {
+                  navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item, fromSearch: true } });
+                }
+              }}
+            />
+          )}
+          itemDimension={isTablet ? 180 : 130}
+          spacing={isTablet ? 14 : 8}
           contentContainerStyle={{ alignContent: 'center' }}
         />
       ) : (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 16, color: '#666', textAlign: 'center' }}>
+          <Text style={{ fontSize: 16, color: '#888', textAlign: 'center' }}>
             Press Enter to search
           </Text>
         </View>
       )}
-    </SafeAreaView>
-  );
-};
-
-const RenderCard = ({ item, isTablet }) => {
-  const navigation = useNavigation();
-  const imageHeight = isTablet ? 260 : 200;
-
-  return (
-    <Pressable
-      onPress={() => {
-        if (item.type === 'movie') {
-          navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
-        } else {
-          navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item, fromSearch: true } });
-        }
-      }}>
-      <View
-        style={{
-          width: '100%',
-          borderWidth: 1,
-          borderRadius: 8,
-          borderColor: 'rgba(153, 153, 153, 0.2)',
-          overflow: 'hidden',
-        }}>
-        <Image
-          source={{
-            uri: item.image,
-          }}
-          style={{ width: '100%', height: imageHeight, borderTopLeftRadius: 7, borderTopRightRadius: 7 }}
-          resizeMode="cover"
-        />
-        <View style={{ padding: 6, height: 48, justifyContent: 'center' }}>
-          <Text
-            numberOfLines={2}
-            style={{
-              textAlign: 'center',
-              fontSize: 13,
-              lineHeight: 18,
-            }}>
-            {item.title} {item.year ? `(${item.year})` : ''}
-          </Text>
-        </View>
-
-        <Badge
-          style={{
-            backgroundColor: 'orange',
-            position: 'absolute',
-            right: 5,
-            top: 5,
-          }}>
-          {item.rate}
-        </Badge>
       </View>
-    </Pressable>
+      <MobileBottomNav activeTab="search" />
+    </SafeAreaView>
   );
 };
 

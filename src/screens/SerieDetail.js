@@ -156,7 +156,7 @@ const SerieDetails = ({ navigation, route }) => {
     });
   };
 
-  const EpisodeItem = ({ episode, s, navigation }) => {
+  const EpisodeItem = ({ episode, s }) => {
     const downloads = useStreamStore(store => store.downloads);
     const key = streamKey({
       type: 'tv',
@@ -167,41 +167,91 @@ const SerieDetails = ({ navigation, route }) => {
     const download = downloads[key];
 
     return (
-      <TouchableOpacity onPress={() => onEpisodePress(episode)}>
+      <TouchableOpacity
+        onPress={() => onEpisodePress(episode)}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 10,
+          paddingHorizontal: 14,
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+        }}>
+        {/* 16:9 Thumbnail with play overlay */}
         <View
           style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            padding: 10,
+            width: 115,
+            height: 65,
+            borderRadius: 8,
+            overflow: 'hidden',
+            backgroundColor: '#1c1c1e',
+            position: 'relative',
           }}>
-          <Image
-            source={{
-              uri: `https://image.tmdb.org/t/p/w500/${episode.still_path}`,
-            }}
-            style={{ width: 100, height: 100, borderRadius: 10 }}
-          />
-          <Caption style={{ padding: 10 }}>{episode.episode_number}</Caption>
-          <Caption style={{ padding: 10, flex: 1 }}>{episode.name}</Caption>
-          <IconButton
-            icon={downloadIcon(download)}
-            iconColor={
-              download && download.status !== 'completed'
-                ? theme.colors.primary
-                : undefined
-            }
-            size={20}
-            onPress={() =>
-              downloadEpisode({
-                serie: s,
-                seasonNumber: episode.season_number,
-                episodeNumber: episode.episode_number,
-                stillPath: episode.still_path,
-                episodeTitle: episode.name,
-              })
-            }
-          />
+          {episode.still_path ? (
+            <Image
+              source={{ uri: `https://image.tmdb.org/t/p/w500/${episode.still_path}` }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+              <Icon source="television-play" size={24} color="#666" />
+            </View>
+          )}
+          <View
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'rgba(0,0,0,0.3)',
+            }}>
+            <Icon source="play-circle" size={24} color="#ffffff" />
+          </View>
         </View>
-        <Divider />
+
+        {/* Info */}
+        <View style={{ flex: 1, paddingLeft: 12, paddingRight: 6 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+            <Text style={{ color: '#E50914', fontSize: 11, fontWeight: 'bold', marginRight: 6 }}>
+              EP {episode.episode_number}
+            </Text>
+            {episode.runtime ? (
+              <Text style={{ color: 'rgba(255,255,255,0.45)', fontSize: 11 }}>
+                {episode.runtime}m
+              </Text>
+            ) : null}
+          </View>
+          <Text numberOfLines={1} style={{ color: '#ffffff', fontSize: 14, fontWeight: '600' }}>
+            {episode.name}
+          </Text>
+          {episode.overview ? (
+            <Text numberOfLines={2} style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginTop: 2, lineHeight: 16 }}>
+              {episode.overview}
+            </Text>
+          ) : null}
+        </View>
+
+        {/* Download Action */}
+        <IconButton
+          icon={downloadIcon(download)}
+          iconColor={
+            download && download.status === 'completed'
+              ? '#4CAF50'
+              : download && download.status !== 'completed'
+              ? '#E50914'
+              : 'rgba(255,255,255,0.7)'
+          }
+          size={20}
+          onPress={() =>
+            downloadEpisode({
+              serie: s,
+              seasonNumber: episode.season_number,
+              episodeNumber: episode.episode_number,
+              stillPath: episode.still_path,
+              episodeTitle: episode.name,
+            })
+          }
+        />
       </TouchableOpacity>
     );
   };
@@ -421,88 +471,177 @@ const SerieDetails = ({ navigation, route }) => {
   }
 
   // Mobile layout
-  return (
-    <ScrollView>
-      <Image source={{ uri: serie.image }} style={{ width: '100%', height: 200 }} />
-
-      <IconButton
-        mode="contained-tonal"
-        onPress={handleBack}
-        style={{ position: 'absolute', top: 10, left: 10, zIndex: 1 }}
-        icon="arrow-left"
-      />
-      <Subheading style={{ padding: 10 }}>
-        {serie.title} ({serie.year})
-      </Subheading>
-      {continueWatching ? (
-        <Button
-          onPress={() => {
-            navigation.navigate('VideoPlayer', {
-              id: continueWatching.id,
-              type: 'tv',
-              season: continueWatching.season,
-              episode: continueWatching.episode,
-            });
-          }}>
-          Continue Season {continueWatching.season} Episode{' '}
-          {continueWatching.episode}
-        </Button>
-      ) : null}
-      <Button
-        style={{ marginHorizontal: 10 }}
-        mode="outlined"
-        icon="download"
-        disabled={!episodes.length}
-        onPress={() => {
-          episodes.forEach(item =>
-            downloadEpisode({
-              serie,
-              seasonNumber: item.season_number,
-              episodeNumber: item.episode_number,
-              stillPath: item.still_path,
-              episodeTitle: item.name,
-            }),
-          );
-        }}>
-        Download season {season}
-      </Button>
-      <Menu
-        visible={menuVisible}
-        onDismiss={() => {
-          setMenuVisible(false);
-        }}
-        anchor={
-          <Button
-            style={{ width: 200 }}
-            mode="text"
-            onPress={() => {
-              setMenuVisible(true);
-            }}>
-            Season {season}
-          </Button>
-        }>
-        <FlatList
-          data={Array.from({ length: seasons }, (_, i) => i + 1)}
-          renderItem={({ item }) => (
-            <Menu.Item
-              onPress={() => {
-                setSeason(item);
-                setMenuVisible(false);
-              }}
-              title={`Season ${item}`}
-            />
-          )}
-          keyExtractor={item => item.toString()}
+  const MobileHeader = () => (
+    <View style={{backgroundColor: '#121212'}}>
+      {/* Backdrop Header */}
+      <View style={{height: 250, width: '100%', position: 'relative', backgroundColor: '#1c1c1e'}}>
+        <Image
+          source={{
+            uri: serie.backdropLarge || serie.image,
+          }}
+          style={{width: '100%', height: '100%'}}
+          resizeMode="cover"
         />
-      </Menu>
-      <FlatList
-        data={episodes}
-        renderItem={({ item }) => (
-          <EpisodeItem episode={item} s={serie} navigation={navigation} />
-        )}
-        keyExtractor={item => item.id.toString()}
-      />
-    </ScrollView>
+
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0,0,0,0.45)',
+          }}
+        />
+
+        <IconButton
+          mode="contained-tonal"
+          onPress={handleBack}
+          containerColor="rgba(0,0,0,0.6)"
+          iconColor="#ffffff"
+          style={{position: 'absolute', top: 12, left: 12, zIndex: 10}}
+          icon="arrow-left"
+          size={22}
+        />
+
+        <View
+          style={{
+            position: 'absolute',
+            left: 16,
+            right: 16,
+            bottom: 16,
+          }}>
+          <Text style={{color: '#ffffff', fontSize: 24, fontWeight: 'bold', marginBottom: 6}}>
+            {serie.title}
+          </Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            {serie.year ? (
+              <View
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                  marginRight: 8,
+                }}>
+                <Text style={{color: '#fff', fontSize: 12, fontWeight: '500'}}>{serie.year}</Text>
+              </View>
+            ) : null}
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}>
+              <Text style={{color: '#fff', fontSize: 10, fontWeight: 'bold'}}>HD</Text>
+            </View>
+          </View>
+        </View>
+      </View>
+
+      {/* Action Buttons */}
+      <View style={{paddingHorizontal: 14, paddingTop: 14}}>
+        {continueWatching ? (
+          <Button
+            mode="contained"
+            icon="play"
+            buttonColor="#E50914"
+            textColor="#ffffff"
+            style={{borderRadius: 10, marginBottom: 10}}
+            contentStyle={{height: 44}}
+            labelStyle={{fontWeight: 'bold', fontSize: 15}}
+            onPress={() => {
+              navigation.navigate('VideoPlayer', {
+                id: continueWatching.id,
+                type: 'tv',
+                season: continueWatching.season,
+                episode: continueWatching.episode,
+              });
+            }}>
+            Continue S{continueWatching.season} E{continueWatching.episode}
+          </Button>
+        ) : null}
+
+        <Button
+          mode="contained-tonal"
+          icon="download"
+          buttonColor="rgba(255,255,255,0.12)"
+          textColor="#ffffff"
+          style={{borderRadius: 10, marginBottom: 12}}
+          contentStyle={{height: 42}}
+          labelStyle={{fontWeight: 'bold', fontSize: 13}}
+          disabled={!episodes.length}
+          onPress={() => {
+            episodes.forEach(item =>
+              downloadEpisode({
+                serie,
+                seasonNumber: item.season_number,
+                episodeNumber: item.episode_number,
+                stillPath: item.still_path,
+                episodeTitle: item.name,
+              }),
+            );
+          }}>
+          Download season {season}
+        </Button>
+
+        {/* Season Selector Pills */}
+        <Text style={{color: 'rgba(255,255,255,0.6)', fontSize: 13, fontWeight: 'bold', textTransform: 'uppercase', marginBottom: 8}}>
+          Seasons
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{marginBottom: 12}}>
+          {Array.from({ length: seasons }, (_, i) => i + 1).map(sNum => (
+            <TouchableOpacity
+              key={sNum}
+              onPress={() => setSeason(sNum)}
+              style={{
+                backgroundColor: season === sNum ? '#E50914' : 'rgba(255,255,255,0.1)',
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+                borderRadius: 20,
+                marginRight: 8,
+              }}>
+              <Text
+                style={{
+                  color: '#ffffff',
+                  fontSize: 13,
+                  fontWeight: season === sNum ? 'bold' : '500',
+                }}>
+                Season {sNum}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Episodes Heading */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingVertical: 8,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: 'rgba(255,255,255,0.15)',
+          }}>
+          <Text style={{color: '#ffffff', fontSize: 18, fontWeight: 'bold'}}>
+            Episodes
+          </Text>
+          <Text style={{color: 'rgba(255,255,255,0.5)', fontSize: 13}}>
+            {episodes.length} episodes
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+
+  return (
+    <FlatList
+      style={{flex: 1, backgroundColor: '#121212'}}
+      contentContainerStyle={{paddingBottom: 40}}
+      data={episodes}
+      keyExtractor={item => item.id.toString()}
+      ListHeaderComponent={MobileHeader}
+      renderItem={({ item }) => (
+        <EpisodeItem episode={item} s={serie} />
+      )}
+    />
   );
 };
 

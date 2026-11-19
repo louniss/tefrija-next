@@ -257,74 +257,216 @@ const MovieDetail = ({navigation, route}) => {
   }
 
   // Mobile layout
+  const year = movie.release_date ? new Date(movie.release_date).getFullYear() : '';
+  const rating = movie.vote_average ? Number(movie.vote_average).toFixed(1) : null;
+  const runtimeStr = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : null;
+
   return (
-    <ScrollView>
-      <View>
-        <Animated.Image
-          style={styles.image}
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      style={{flex: 1, backgroundColor: '#121212'}}
+      contentContainerStyle={{paddingBottom: 40, backgroundColor: '#121212'}}>
+      {/* Backdrop Header */}
+      <View style={{height: 300, width: '100%', position: 'relative', backgroundColor: '#1c1c1e'}}>
+        <Image
           source={{
-            uri: `https://image.tmdb.org/t/p/w780/${movie.poster_path}`,
+            uri: movie.backdrop_path
+              ? `https://image.tmdb.org/t/p/w1280/${movie.backdrop_path}`
+              : `https://image.tmdb.org/t/p/w780/${movie.poster_path}`,
           }}
-          sharedTransitionTag="movie-image"
+          style={{width: '100%', height: '100%'}}
+          resizeMode="cover"
         />
 
+        {/* Gradient shadow for seamless fade to dark background */}
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: 'rgba(0,0,0,0.4)',
+          }}
+        />
+
+        {/* Floating Back Button */}
         <IconButton
           mode="contained-tonal"
-          onPress={handleBack}
-          style={styles.absolute}
           icon="arrow-left"
+          size={22}
+          containerColor="rgba(0,0,0,0.6)"
+          iconColor="#ffffff"
+          style={{position: 'absolute', top: 12, left: 12, zIndex: 10}}
+          onPress={handleBack}
         />
 
+        {/* Big Play Overlay in Center of Backdrop */}
         <View style={styles.absoluteCenter}>
           {loading ? (
-            <ActivityIndicator mode="contained" size={40} />
+            <ActivityIndicator mode="contained" size={44} color="#ffffff" />
           ) : (
             <IconButton
-              size={40}
+              size={48}
               mode="contained"
-              icon={'play'}
+              containerColor="rgba(229, 9, 20, 0.9)"
+              iconColor="#ffffff"
+              icon="play"
               onPress={play}
             />
           )}
         </View>
       </View>
 
-      <Card style={{padding: 5}}>
-        <Headline>{movie.title}</Headline>
-        <View style={{flexDirection: 'row', alignItems: 'center', padding: 5}}>
-          <Chip disabled style={{backgroundColor: 'orange', marginRight: 5}}>
-            {movie.vote_average}
-          </Chip>
-          <Chip disabled>{new Date(movie.release_date).getFullYear()}</Chip>
-          <Chip style={{marginLeft: 5}} icon="high-definition" />
+      {/* Main Content Info */}
+      <View style={{paddingHorizontal: 16, marginTop: 14}}>
+        <Text style={{fontSize: 24, fontWeight: 'bold', color: '#ffffff', marginBottom: 4}}>
+          {movie.title}
+        </Text>
+
+        {movie.tagline ? (
+          <Text style={{fontSize: 14, fontStyle: 'italic', color: 'rgba(255,255,255,0.65)', marginBottom: 10}}>
+            "{movie.tagline}"
+          </Text>
+        ) : null}
+
+        {/* Meta badges row */}
+        <View style={{flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginBottom: 14}}>
+          {rating && rating > 0 && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: 'rgba(255, 184, 0, 0.25)',
+                borderColor: 'rgba(255, 184, 0, 0.6)',
+                borderWidth: 1,
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 12,
+                marginRight: 8,
+                marginVertical: 4,
+              }}>
+              <Text style={{color: '#FFB800', fontWeight: 'bold', fontSize: 12, marginRight: 3}}>
+                ★
+              </Text>
+              <Text style={{color: '#ffffff', fontWeight: 'bold', fontSize: 12}}>
+                {rating}
+              </Text>
+            </View>
+          )}
+
+          {year ? (
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 12,
+                marginRight: 8,
+                marginVertical: 4,
+              }}>
+              <Text style={{color: '#ffffff', fontSize: 12, fontWeight: '500'}}>{year}</Text>
+            </View>
+          ) : null}
+
+          {runtimeStr ? (
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
+                borderRadius: 12,
+                marginRight: 8,
+                marginVertical: 4,
+              }}>
+              <Text style={{color: '#ffffff', fontSize: 12, fontWeight: '500'}}>{runtimeStr}</Text>
+            </View>
+          ) : null}
+
+          <View
+            style={{
+              backgroundColor: 'rgba(255,255,255,0.15)',
+              paddingHorizontal: 6,
+              paddingVertical: 3,
+              borderRadius: 6,
+              marginVertical: 4,
+            }}>
+            <Text style={{color: '#ffffff', fontSize: 11, fontWeight: 'bold'}}>HD</Text>
+          </View>
         </View>
 
-        <Button
-          style={{margin: 5, borderRadius: 5}}
-          mode="contained-tonal"
-          disabled={
-            !movie.id ||
-            (download &&
-              (download.status === 'downloading' || download.status === 'queued'))
-          }
-          onPress={startDownload}
-          icon={download && download.status === 'completed' ? 'check' : 'download'}>
-          {downloadLabel()}
-        </Button>
-        <Button
-          style={{margin: 5, borderRadius: 5}}
-          mode="contained-tonal"
-          loading={loading}
-          disabled={loading}
-          onPress={play}
-          icon="play">
-          Play
-        </Button>
-      </Card>
+        {/* Action Buttons: Play & Download */}
+        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 14}}>
+          <Button
+            mode="contained"
+            icon="play"
+            buttonColor="#E50914"
+            textColor="#ffffff"
+            loading={loading}
+            disabled={loading}
+            onPress={play}
+            style={{flex: 1, marginRight: 8, borderRadius: 10}}
+            contentStyle={{height: 44}}
+            labelStyle={{fontWeight: 'bold', fontSize: 15}}>
+            Play
+          </Button>
 
-      <Card style={{margin: 5, padding: 5}}>
-        <Caption>{movie.overview}</Caption>
-      </Card>
+          <Button
+            mode="contained-tonal"
+            icon={download && download.status === 'completed' ? 'check' : 'download'}
+            buttonColor="rgba(255,255,255,0.15)"
+            textColor="#ffffff"
+            disabled={
+              !movie.id ||
+              (download &&
+                (download.status === 'downloading' || download.status === 'queued'))
+            }
+            onPress={startDownload}
+            style={{flex: 1, borderRadius: 10}}
+            contentStyle={{height: 44}}
+            labelStyle={{fontWeight: 'bold', fontSize: 14}}>
+            {downloadLabel()}
+          </Button>
+        </View>
+
+        {/* Genre pills */}
+        {movie.genres && movie.genres.length > 0 ? (
+          <View style={{flexDirection: 'row', flexWrap: 'wrap', marginBottom: 14}}>
+            {movie.genres.map(g => (
+              <View
+                key={g.id}
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.08)',
+                  paddingHorizontal: 12,
+                  paddingVertical: 5,
+                  borderRadius: 16,
+                  marginRight: 6,
+                  marginBottom: 6,
+                  borderWidth: 1,
+                  borderColor: 'rgba(255,255,255,0.12)',
+                }}>
+                <Text style={{color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500'}}>
+                  {g.name}
+                </Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {/* Overview section card */}
+        <View
+          style={{
+            backgroundColor: '#1c1c1e',
+            borderRadius: 12,
+            padding: 16,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.08)',
+            marginBottom: 16,
+          }}>
+          <Text style={{fontSize: 16, fontWeight: 'bold', color: '#ffffff', marginBottom: 6}}>
+            Overview
+          </Text>
+          <Text style={{fontSize: 14, lineHeight: 22, color: 'rgba(255,255,255,0.8)'}}>
+            {movie.overview || 'No synopsis available for this movie.'}
+          </Text>
+        </View>
+      </View>
     </ScrollView>
   );
 };

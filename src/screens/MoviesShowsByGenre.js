@@ -1,10 +1,11 @@
 import * as React from 'react';
-import { View, Pressable, Image, ScrollView } from 'react-native';
+import { View, Pressable, ScrollView } from 'react-native';
 import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { moviedb } from '../movieDb';
 import { Button, Headline, IconButton, Text, ActivityIndicator } from 'react-native-paper';
 import useResponsive from '../utils/useResponsive';
+import MediaCard from '../components/MediaCard';
 
 const MoviesShowsByGenre = () => {
   const navigation = useNavigation();
@@ -35,6 +36,9 @@ const MoviesShowsByGenre = () => {
       const mapped = (res.results || []).map(item => ({
         id: item.id,
         title: item.title || item.name,
+        poster_path: item.poster_path,
+        vote_average: item.vote_average,
+        type: type,
         image: item.poster_path
           ? `https://image.tmdb.org/t/p/w500/${item.poster_path}`
           : (item.backdrop_path ? `https://image.tmdb.org/t/p/w500/${item.backdrop_path}` : null),
@@ -77,10 +81,8 @@ const MoviesShowsByGenre = () => {
     };
   }, [genre]);
 
-  const imageHeight = isTablet ? 260 : 200;
-
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: '#121212' }}>
       <View
         style={{
           flexDirection: 'row',
@@ -88,23 +90,27 @@ const MoviesShowsByGenre = () => {
           paddingHorizontal: isTablet ? 16 : 8,
           paddingVertical: 10,
         }}>
-        <IconButton icon="arrow-left" size={24} onPress={() => navigation.goBack()} />
-        <Headline style={{ marginLeft: 4, fontSize: isTablet ? 24 : 20, fontWeight: 'bold' }}>
+        <IconButton icon="arrow-left" iconColor="#fff" size={24} onPress={() => navigation.goBack()} />
+        <Headline style={{ marginLeft: 4, fontSize: isTablet ? 24 : 18, fontWeight: 'bold', color: '#fff' }}>
           {activeGenre?.name || genre?.name || 'Genre'}
         </Headline>
         <View style={{ flex: 1 }} />
         <Button
           mode={type === 'movie' ? 'contained' : 'text'}
+          textColor={type === 'movie' ? '#fff' : '#aaa'}
+          buttonColor={type === 'movie' ? '#E50914' : undefined}
           onPress={() => setType('movie')}
           disabled={!activeGenre?.movieId && !genre?.movieId}
-          style={{ marginRight: 8, borderRadius: 8 }}>
+          style={{ marginRight: 8, borderRadius: 20 }}>
           Movies
         </Button>
         <Button
           mode={type === 'tv' ? 'contained' : 'text'}
+          textColor={type === 'tv' ? '#fff' : '#aaa'}
+          buttonColor={type === 'tv' ? '#E50914' : undefined}
           onPress={() => setType('tv')}
           disabled={!activeGenre?.tvId && !genre?.tvId}
-          style={{ borderRadius: 8 }}>
+          style={{ borderRadius: 20 }}>
           Series
         </Button>
       </View>
@@ -112,13 +118,21 @@ const MoviesShowsByGenre = () => {
       {/* If no activeGenre, show selector UI */}
       {!activeGenre ? (
         <View style={{ padding: isTablet ? 20 : 12 }}>
-          <Text style={{ marginBottom: 8, fontSize: 16 }}>Choose type and genre</Text>
+          <Text style={{ marginBottom: 8, fontSize: 16, color: '#fff' }}>Choose type and genre</Text>
           <View style={{ flexDirection: 'row', marginBottom: 10 }}>
-            <Button mode={type === 'movie' ? 'contained' : 'outlined'} onPress={() => setType('movie')}>
+            <Button
+              mode={type === 'movie' ? 'contained' : 'outlined'}
+              buttonColor={type === 'movie' ? '#E50914' : undefined}
+              textColor="#fff"
+              onPress={() => setType('movie')}>
               Movies
             </Button>
             <View style={{ width: 12 }} />
-            <Button mode={type === 'tv' ? 'contained' : 'outlined'} onPress={() => setType('tv')}>
+            <Button
+              mode={type === 'tv' ? 'contained' : 'outlined'}
+              buttonColor={type === 'tv' ? '#E50914' : undefined}
+              textColor="#fff"
+              onPress={() => setType('tv')}>
               Series
             </Button>
           </View>
@@ -137,51 +151,25 @@ const MoviesShowsByGenre = () => {
                   paddingHorizontal: 14,
                   paddingVertical: 8,
                   borderRadius: 20,
-                  backgroundColor: '#eee',
+                  backgroundColor: '#252525',
                   marginRight: 8,
                 }}>
-                <Text>{g.name}</Text>
+                <Text style={{ color: '#fff' }}>{g.name}</Text>
               </Pressable>
             ))}
           </ScrollView>
         </View>
       ) : loading && page === 1 ? (
         <View style={{ padding: 30, alignItems: 'center' }}>
-          <ActivityIndicator animating size="large" />
+          <ActivityIndicator animating color="#E50914" size="large" />
         </View>
       ) : (
         <FlatGrid
           data={results}
-          itemDimension={isTablet ? 180 : 120}
-          spacing={isTablet ? 14 : 10}
+          itemDimension={isTablet ? 180 : 130}
+          spacing={isTablet ? 14 : 8}
           renderItem={({ item }) => (
-            <Pressable
-              onPress={() =>
-                navigation.navigate(type === 'movie' ? 'MovieDetail' : 'SerieDetail', {
-                  [type === 'movie' ? 'movie' : 'serie']: item,
-                })
-              }>
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderRadius: 8,
-                  borderColor: 'rgba(153,153,153,0.2)',
-                  overflow: 'hidden',
-                }}>
-                {item.image ? (
-                  <Image
-                    source={{ uri: item.image }}
-                    style={{ width: '100%', height: imageHeight, borderTopLeftRadius: 7, borderTopRightRadius: 7 }}
-                    resizeMode="cover"
-                  />
-                ) : null}
-                <View style={{ padding: 6, height: 48, justifyContent: 'center' }}>
-                  <Text numberOfLines={2} style={{ textAlign: 'center', fontSize: 13, lineHeight: 18 }}>
-                    {item.title} {item.year ? `(${item.year})` : ''}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
+            <MediaCard item={item} isTablet={isTablet} />
           )}
           onEndReached={() => {
             if (loading) return;

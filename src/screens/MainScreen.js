@@ -12,16 +12,20 @@ import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
 import useMainState from '../state/Main';
-import {Button, Headline, IconButton, Text} from 'react-native-paper';
+import {Button, Headline, IconButton, Text, Icon} from 'react-native-paper';
 
 import Carousel from 'react-native-reanimated-carousel';
 import Animated from 'react-native-reanimated';
 import useResponsive from '../utils/useResponsive';
+import MediaCard from '../components/MediaCard';
+import MobileBottomNav from '../components/MobileBottomNav';
 
-const CarouselCard = ({item}) => {
+const MobileHeroCard = ({item}) => {
   const navigation = useNavigation();
   const startX = React.useRef(0);
   const moved = React.useRef(false);
+
+  const rating = item.vote_average ? Number(item.vote_average).toFixed(1) : null;
 
   return (
     <Pressable
@@ -41,21 +45,151 @@ const CarouselCard = ({item}) => {
       key={item.id}
       style={{
         flex: 1,
-        alignContent: 'center',
-        alignItems: 'center',
-        marginTop: 5,
+        paddingHorizontal: 12,
+        paddingTop: 4,
       }}>
-      <Animated.Image
-        source={{
-          uri: item.imageLarge,
-        }}
+      <View
         style={{
-          width: '90%',
-          height: 500,
-          borderRadius: 10,
-        }}
-        sharedTransitionTag="movie-image"
-      />
+          flex: 1,
+          borderRadius: 16,
+          overflow: 'hidden',
+          backgroundColor: '#181818',
+          shadowColor: '#000',
+          shadowOffset: {width: 0, height: 6},
+          shadowOpacity: 0.4,
+          shadowRadius: 8,
+          elevation: 6,
+        }}>
+        <Image
+          source={{
+            uri: item.imageLarge || item.image,
+          }}
+          style={{
+            width: '100%',
+            height: '100%',
+            position: 'absolute',
+          }}
+          resizeMode="cover"
+        />
+
+        {/* Gradient Overlay for bottom text legibility */}
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 220,
+            backgroundColor: 'rgba(0,0,0,0.65)',
+          }}
+        />
+
+        {/* Bottom Hero Info */}
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: 16,
+            alignItems: 'center',
+          }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              color: '#ffffff',
+              fontSize: 22,
+              fontWeight: 'bold',
+              textAlign: 'center',
+              marginBottom: 6,
+              textShadowColor: 'rgba(0,0,0,0.9)',
+              textShadowOffset: {width: 1, height: 1},
+              textShadowRadius: 4,
+            }}>
+            {item.title}
+          </Text>
+
+          <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 12}}>
+            {rating && rating > 0 && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: 'rgba(255, 184, 0, 0.25)',
+                  borderColor: 'rgba(255, 184, 0, 0.6)',
+                  borderWidth: 1,
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                  marginRight: 8,
+                }}>
+                <Text style={{color: '#FFB800', fontWeight: 'bold', fontSize: 11, marginRight: 3}}>
+                  ★
+                </Text>
+                <Text style={{color: '#ffffff', fontWeight: 'bold', fontSize: 11}}>
+                  {rating}
+                </Text>
+              </View>
+            )}
+            {item.year ? (
+              <View
+                style={{
+                  backgroundColor: 'rgba(255,255,255,0.2)',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                  marginRight: 8,
+                }}>
+                <Text style={{color: '#fff', fontSize: 11, fontWeight: '500'}}>{item.year}</Text>
+              </View>
+            ) : null}
+            <View
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                paddingHorizontal: 6,
+                paddingVertical: 2,
+                borderRadius: 4,
+              }}>
+              <Text style={{color: '#fff', fontSize: 10, fontWeight: 'bold'}}>HD</Text>
+            </View>
+          </View>
+
+          {/* Action buttons row */}
+          <View style={{flexDirection: 'row', alignItems: 'center', width: '100%', justifyContent: 'center'}}>
+            <Button
+              mode="contained"
+              icon="play"
+              buttonColor="#ffffff"
+              textColor="#000000"
+              style={{flex: 1, maxWidth: 140, marginRight: 10, borderRadius: 20}}
+              contentStyle={{height: 38}}
+              labelStyle={{fontWeight: 'bold', fontSize: 13}}
+              onPress={() => {
+                navigation.navigate('VideoPlayer', {
+                  type: 'movie',
+                  id: item.id,
+                  imdbId: item.imdb_id,
+                });
+              }}>
+              Play
+            </Button>
+            <Button
+              mode="contained-tonal"
+              icon="information-outline"
+              buttonColor="rgba(255,255,255,0.25)"
+              textColor="#ffffff"
+              style={{flex: 1, maxWidth: 140, borderRadius: 20}}
+              contentStyle={{height: 38}}
+              labelStyle={{fontWeight: 'bold', fontSize: 13}}
+              onPress={() => {
+                item.type = 'movie';
+                navigation.navigate('MovieDetail', {movie: item});
+              }}>
+              Details
+            </Button>
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
 };
@@ -292,6 +426,8 @@ export const MainScreen = () => {
         return {
           id: item.id,
           title: item.title,
+          poster_path: item.poster_path,
+          vote_average: item.vote_average,
           image: `https://image.tmdb.org/t/p/w500/${item.poster_path}`,
           year: item.release_date ? item.release_date.split('-')[0] : '',
         };
@@ -306,6 +442,8 @@ export const MainScreen = () => {
         return {
           id: item.id,
           title: item.name,
+          poster_path: item.poster_path,
+          vote_average: item.vote_average,
           image: `https://image.tmdb.org/t/p/w500/${item.poster_path}`,
           year: item.first_air_date?.split('-')[0],
         };
@@ -347,27 +485,73 @@ export const MainScreen = () => {
     };
   }, []);
 
+  const SectionHeader = ({title, onMore}) => (
+    <View
+      style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: isTablet ? 16 : 12,
+        paddingTop: 18,
+        paddingBottom: 8,
+      }}>
+      <Text style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold', color: '#ffffff'}}>
+        {title}
+      </Text>
+      {onMore && (
+        <Pressable
+          onPress={onMore}
+          style={({pressed}) => [
+            {
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 4,
+              paddingHorizontal: 8,
+              borderRadius: 12,
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              opacity: pressed ? 0.7 : 1,
+            },
+          ]}>
+          <Text style={{fontSize: 12, fontWeight: 'bold', color: '#E50914', marginRight: 2}}>
+            See all
+          </Text>
+          <Icon source="chevron-right" size={16} color="#E50914" />
+        </Pressable>
+      )}
+    </View>
+  );
+
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      {/* Mobile Header (Drawer icon, Title, Search) */}
+    <View style={{flex: 1, backgroundColor: '#121212'}}>
+      <ScrollView showsVerticalScrollIndicator={false}>
+      {/* Mobile Header (Brand Logo, Drawer, Search) */}
       {!isTabletLandscape && (
         <View
           style={{
             flexDirection: 'row',
             alignItems: 'center',
             justifyContent: 'space-between',
-            paddingHorizontal: 8,
-            paddingVertical: 4,
+            paddingHorizontal: 12,
+            paddingTop: 8,
+            paddingBottom: 6,
           }}>
-          <IconButton
-            icon="menu"
-            size={24}
-            onPress={() => navigation.openDrawer()}
-          />
-          <Text style={{fontSize: 20, fontWeight: 'bold'}}>Tefrija</Text>
+          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+            <IconButton
+              icon="menu"
+              size={24}
+              iconColor="#ffffff"
+              style={{margin: 0, marginRight: 6}}
+              onPress={() => navigation.openDrawer()}
+            />
+            <Text style={{fontSize: 22, fontWeight: '900', color: '#E50914', letterSpacing: 1}}>
+              TEFRIJA
+            </Text>
+          </View>
           <IconButton
             icon="magnify"
-            size={24}
+            size={22}
+            iconColor="#ffffff"
+            style={{margin: 0, backgroundColor: 'rgba(255,255,255,0.1)'}}
             onPress={() => navigation.navigate('Search')}
           />
         </View>
@@ -391,9 +575,9 @@ export const MainScreen = () => {
           />
         ) : (
           <Carousel
-            data={movies}
+            data={movies.slice(0, 10)}
             width={contentWidth}
-            height={550}
+            height={480}
             autoPlay={false}
             panGestureHandlerProps={{
               activeOffsetX: [-10, 20],
@@ -402,15 +586,14 @@ export const MainScreen = () => {
             modeConfig={{
               showLength: 3,
             }}
-            renderItem={({item}) => <CarouselCard item={item} />}
+            renderItem={({item}) => <MobileHeroCard item={item} />}
           />
         )
       )}
 
+      {/* Continue Watching Section */}
       {continueWatching.length > 0 && (
-        <View style={{paddingHorizontal: isTablet ? 16 : 8, paddingTop: 12}}>
-          <Headline style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold'}}>Continue Watching</Headline>
-        </View>
+        <SectionHeader title="Continue Watching" />
       )}
       {continueWatching.length > 0 && (
         <FlatList
@@ -418,41 +601,41 @@ export const MainScreen = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{paddingHorizontal: isTablet ? 12 : 6}}
           data={continueWatching}
-          renderItem={({item}) => <RenderCard item={item} cardWidth={cardWidth} imageHeight={imageHeight} />}
+          renderItem={({item}) => (
+            <MediaCard
+              item={item}
+              cardWidth={cardWidth}
+              imageHeight={imageHeight}
+              isTablet={isTablet}
+            />
+          )}
         />
       )}
 
       {/* Genres section */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: isTablet ? 16 : 8,
-          paddingTop: 12,
-        }}>
-        <Headline style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold'}}>Genres</Headline>
-      </View>
-
+      <SectionHeader title="Genres" />
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ paddingVertical: 8 }}
-        contentContainerStyle={{ paddingHorizontal: isTablet ? 16 : 8 }}>
+        style={{ paddingVertical: 4 }}
+        contentContainerStyle={{ paddingHorizontal: isTablet ? 16 : 10 }}>
         {genres.map(g => (
           <Pressable
             key={g.name}
             onPress={() => {
               navigation.navigate('MoviesShowsByGenre', { genre: g });
             }}
-            style={{
-              paddingHorizontal: isTablet ? 16 : 12,
+            style={({pressed}) => [{
+              paddingHorizontal: isTablet ? 16 : 14,
               paddingVertical: isTablet ? 8 : 7,
               borderRadius: 20,
-              backgroundColor: isDarkMode ? '#2c2c2c' : '#e5e5e5',
+              backgroundColor: 'rgba(255,255,255,0.08)',
+              borderWidth: 1,
+              borderColor: 'rgba(255,255,255,0.12)',
               marginRight: 8,
-            }}>
-            <Text style={{ color: isDarkMode ? '#fff' : '#000', fontSize: isTablet ? 14 : 13 }}>
+              opacity: pressed ? 0.75 : 1,
+            }]}>
+            <Text style={{ color: '#ffffff', fontSize: isTablet ? 14 : 13, fontWeight: '600' }}>
               {g.name}
             </Text>
           </Pressable>
@@ -460,136 +643,86 @@ export const MainScreen = () => {
       </ScrollView>
 
       {/* Popular Movies */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: isTablet ? 16 : 8,
-          paddingTop: 8,
-        }}>
-        <Headline style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold'}}>Popular Movies</Headline>
-        <Button onPress={() => navigation.navigate('PopularMovies')}>
-          more
-        </Button>
-      </View>
+      <SectionHeader
+        title="Popular Movies"
+        onMore={() => navigation.navigate('PopularMovies')}
+      />
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{paddingHorizontal: isTablet ? 12 : 6}}
         data={movies}
-        renderItem={({item}) => <RenderCard item={{...item, type: 'movie'}} cardWidth={cardWidth} imageHeight={imageHeight} />}
+        renderItem={({item}) => (
+          <MediaCard
+            item={{...item, type: 'movie'}}
+            cardWidth={cardWidth}
+            imageHeight={imageHeight}
+            isTablet={isTablet}
+          />
+        )}
       />
 
       {/* Popular Series */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: isTablet ? 16 : 8,
-          paddingTop: 8,
-        }}>
-        <Headline style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold'}}>Popular Series</Headline>
-        <Button onPress={() => navigation.navigate('PopularShows')}>
-          more
-        </Button>
-      </View>
+      <SectionHeader
+        title="Popular Series"
+        onMore={() => navigation.navigate('PopularShows')}
+      />
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{paddingHorizontal: isTablet ? 12 : 6}}
         data={series}
-        renderItem={({item}) => <RenderCard item={{...item, type: 'tv'}} cardWidth={cardWidth} imageHeight={imageHeight} />}
+        renderItem={({item}) => (
+          <MediaCard
+            item={{...item, type: 'tv'}}
+            cardWidth={cardWidth}
+            imageHeight={imageHeight}
+            isTablet={isTablet}
+          />
+        )}
       />
 
       {/* Top Rated Movies */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: isTablet ? 16 : 8,
-          paddingTop: 8,
-        }}>
-        <Headline style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold'}}>Top Rated Movies</Headline>
-        <Button onPress={() => navigation.navigate('TopRatedMovies')}>
-          more
-        </Button>
-      </View>
+      <SectionHeader
+        title="Top Rated Movies"
+        onMore={() => navigation.navigate('TopRatedMovies')}
+      />
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{paddingHorizontal: isTablet ? 12 : 6}}
         data={topRatedMovies}
-        renderItem={({item}) => <RenderCard item={{...item, type: 'movie'}} cardWidth={cardWidth} imageHeight={imageHeight} />}
+        renderItem={({item}) => (
+          <MediaCard
+            item={{...item, type: 'movie'}}
+            cardWidth={cardWidth}
+            imageHeight={imageHeight}
+            isTablet={isTablet}
+          />
+        )}
       />
 
       {/* Top Rated Series */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          paddingHorizontal: isTablet ? 16 : 8,
-          paddingTop: 8,
-        }}>
-        <Headline style={{fontSize: isTablet ? 22 : 18, fontWeight: 'bold'}}>Top Rated Series</Headline>
-        <Button onPress={() => navigation.navigate('TopRatedShows')}>
-          more
-        </Button>
-      </View>
+      <SectionHeader
+        title="Top Rated Series"
+        onMore={() => navigation.navigate('TopRatedShows')}
+      />
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{paddingHorizontal: isTablet ? 12 : 6, paddingBottom: 24}}
+        contentContainerStyle={{paddingHorizontal: isTablet ? 12 : 6, paddingBottom: 28}}
         data={topRatedSeries}
-        renderItem={({item}) => <RenderCard item={{...item, type: 'tv'}} cardWidth={cardWidth} imageHeight={imageHeight} />}
+        renderItem={({item}) => (
+          <MediaCard
+            item={{...item, type: 'tv'}}
+            cardWidth={cardWidth}
+            imageHeight={imageHeight}
+            isTablet={isTablet}
+          />
+        )}
       />
-    </ScrollView>
-  );
-};
-
-const RenderCard = ({item, cardWidth = 151, imageHeight = 200}) => {
-  const navigation = useNavigation();
-
-  return (
-    <Pressable
-      onPress={() => {
-        if (item.type === 'movie') {
-          navigation.navigate('MovieDetail', {movie: item});
-        } else {
-          navigation.navigate('SerieDetail', {serie: item});
-        }
-      }}>
-      <View
-        style={{
-          width: cardWidth,
-          borderWidth: 1,
-          borderRadius: 8,
-          borderColor: 'rgba(153, 153, 153, 0.2)',
-          margin: 6,
-          overflow: 'hidden',
-        }}>
-        <Image
-          source={{
-            uri: item.image,
-          }}
-          style={{width: '100%', height: imageHeight, borderTopLeftRadius: 7, borderTopRightRadius: 7}}
-          resizeMode="cover"
-        />
-        <View style={{padding: 8, height: 56, justifyContent: 'center'}}>
-          <Text
-            numberOfLines={2}
-            style={{
-              fontSize: 13,
-              fontWeight: '500',
-              lineHeight: 18,
-            }}>
-            {item.title} {item.year ? `(${item.year})` : ''}
-          </Text>
-        </View>
-      </View>
-    </Pressable>
+      </ScrollView>
+      <MobileBottomNav activeTab="home" />
+    </View>
   );
 };
