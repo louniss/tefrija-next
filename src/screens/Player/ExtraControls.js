@@ -73,6 +73,9 @@ const ExtraControls = ({
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
+  /* Any interaction restarts the auto-hide countdown; the tick is also what
+   * keeps the timer from being recreated on every unrelated render. */
+  const [interactionTick, setInteractionTick] = useState(0);
 
   // Modals / Panels
   const [showAudioSubModal, setShowAudioSubModal] = useState(false);
@@ -221,6 +224,16 @@ const ExtraControls = ({
     }
   };
 
+  const setControls = nextState => {
+    setControlsVisible(nextState);
+    setInteractionTick(tick => tick + 1);
+    Animated.timing(fadeAnim, {
+      toValue: nextState ? 1 : 0,
+      duration: 250,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const toggleControls = () => {
     if (showAudioSubModal || showEpisodesPanel || showSpeedMenu) {
       setShowAudioSubModal(false);
@@ -228,14 +241,39 @@ const ExtraControls = ({
       setShowSpeedMenu(false);
       return;
     }
-    const nextState = !controlsVisible;
-    setControlsVisible(nextState);
-    Animated.timing(fadeAnim, {
-      toValue: nextState ? 1 : 0,
-      duration: 250,
-      useNativeDriver: true,
-    }).start();
+    setControls(!controlsVisible);
   };
+
+  /* Controls are transient while playback runs: they fade out on their own, and
+   * a tap anywhere on the picture hides them immediately. They stay put while
+   * paused, while locked, and while a panel is open. */
+  const AUTO_HIDE_MS = 4000;
+  useEffect(() => {
+    if (
+      !controlsVisible ||
+      !isPlaying ||
+      isLocked ||
+      showAudioSubModal ||
+      showEpisodesPanel ||
+      showSpeedMenu
+    ) {
+      return undefined;
+    }
+    const timer = setTimeout(
+      () => setControls(false),
+      AUTO_HIDE_MS,
+    );
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    controlsVisible,
+    isPlaying,
+    isLocked,
+    showAudioSubModal,
+    showEpisodesPanel,
+    showSpeedMenu,
+    interactionTick,
+  ]);
 
   const lastTap = useRef(null);
 
@@ -368,7 +406,7 @@ const ExtraControls = ({
           {opacity: fadeAnim, display: controlsVisible && !isLocked ? 'flex' : 'none'},
         ]}>
         {/* Top Header Bar */}
-        <View style={styles.topBar}>
+        <View style={styles.topBar} pointerEvents="box-none">
           <IconButton
             icon="arrow-left"
             iconColor="#fff"
@@ -396,7 +434,7 @@ const ExtraControls = ({
         )}
 
         {/* Bottom Controls Bar (Netflix Style - Image 1) */}
-        <View style={styles.bottomBar}>
+        <View style={styles.bottomBar} pointerEvents="box-none">
           {/* Progress Timeline Row */}
           <View style={styles.timelineRow}>
             <Slider
@@ -836,6 +874,16 @@ const ExtraControls = ({
           <WebView source={{uri: adUrl}} style={{width: 1, height: 1}} />
         </View>
       )}
+
+      {/* With the overlay hidden there is nothing interactive left to catch a
+       * tap, so the picture needs its own layer — without it the controls never
+       * came back once they auto-hid. */}
+      {!controlsVisible && !isLocked ? (
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={handleScreenPress}
+        />
+      ) : null}
     </View>
   );
 };

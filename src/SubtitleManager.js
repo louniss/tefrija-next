@@ -21,6 +21,12 @@ const ensureSubtitleDir = async () => {
 const subtitleCachePath = subtitleInfo =>
   `${SUBTITLE_DIR}/${subtitleInfo.id}.txt`;
 
+/* The playback screen only knows the media and the language, so the resolved
+ * text is also stored under that pair: a subtitle that was used once loads
+ * offline next time without touching the subtitle service at all. */
+const mediaCachePath = (imdbId, lang, index) =>
+  `${SUBTITLE_DIR}/${imdbId}-${lang}-${index}.txt`;
+
 const LANGS = [
   {title: 'Abkhazian', value: 'abk'},
   {title: 'Afrikaans', value: 'afr'},
@@ -134,6 +140,33 @@ const LANGS = [
 class SubtitleManager {
   constructor() {
     this.langs = LANGS;
+  }
+
+  /** A subtitle already stored for this media/language, if any. */
+  async getLocalSubtitleForMedia(imdbId, lang, index = 0) {
+    try {
+      const file = mediaCachePath(imdbId, lang, index);
+      if (await RNFS.exists(file)) {
+        console.log('using local subtitle for media', imdbId, lang, index);
+        return JSON.parse(await RNFS.readFile(file, 'utf8'));
+      }
+    } catch (e) {
+      console.log('could not read media subtitle', imdbId, e.message);
+    }
+    return null;
+  }
+
+  async saveLocalSubtitleForMedia(imdbId, lang, index, result) {
+    try {
+      await ensureSubtitleDir();
+      await RNFS.writeFile(
+        mediaCachePath(imdbId, lang, index),
+        JSON.stringify(result),
+        'utf8',
+      );
+    } catch (e) {
+      console.log('could not cache media subtitle', imdbId, e.message);
+    }
   }
 
   async getLocalSubtitle(subtitleInfo) {

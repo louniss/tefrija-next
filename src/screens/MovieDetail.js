@@ -8,7 +8,9 @@ import {
   Chip,
   Headline,
   IconButton,
+  ProgressBar,
   Text,
+  useTheme,
 } from 'react-native-paper';
 
 import {moviedb} from '../movieDb';
@@ -20,6 +22,7 @@ import useResponsive from '../utils/useResponsive';
 const MovieDetail = ({navigation, route}) => {
   const [movie, setMovie] = React.useState({});
   const state = useMainState();
+  const theme = useTheme();
   const {isTablet} = useResponsive();
   const downloads = useStreamStore(store => store.downloads);
   const downloadKey = movie.id ? streamKey({type: 'movie', id: movie.id}) : null;
@@ -63,23 +66,69 @@ const MovieDetail = ({navigation, route}) => {
     });
   };
 
+  const percent =
+    download && download.total
+      ? Math.min(100, Math.round((download.done / download.total) * 100))
+      : 0;
+
   const downloadLabel = () => {
     if (!download) {
       return 'Download';
     }
     switch (download.status) {
       case 'completed':
-        return 'Downloaded';
+        return download.skipped ? `Downloaded · ${percent}%` : 'Downloaded';
       case 'downloading':
-        return download.total
-          ? `Downloading ${download.done}/${download.total}`
-          : 'Preparing…';
+        return download.total ? `${percent}%` : 'Preparing…';
       case 'queued':
-        return 'Queued';
+        return download.total ? `Queued · ${percent}%` : 'Queued';
+      case 'paused':
+        return `Paused · ${percent}%`;
       case 'error':
         return 'Retry download';
       default:
         return 'Download';
+    }
+  };
+
+  const downloadIcon = () => {
+    if (!download) {
+      return 'download';
+    }
+    switch (download.status) {
+      case 'completed':
+        return 'check';
+      case 'downloading':
+      case 'queued':
+        return 'pause';
+      case 'paused':
+      case 'error':
+        return 'download';
+      default:
+        return 'download';
+    }
+  };
+
+  /* One button does the whole cycle: start, pause, resume. It is never disabled
+   * while a download runs — a disabled Paper button greys its label out on a
+   * tonal background, which read as "no text at all". */
+  const onDownloadPress = () => {
+    const store = useStreamStore.getState();
+    if (!download || download.status === 'completed' || download.status === 'error') {
+      startDownload();
+      return;
+    }
+    if (download.status === 'downloading' || download.status === 'queued') {
+      if (download.status === 'queued') {
+        // Nothing has started yet: simply drop it from the queue.
+        store.removeStream(download.key);
+        return;
+      }
+      store.pauseDownload(download.key);
+      return;
+    }
+    if (download.status === 'paused') {
+      store.resumeDownload(download.key);
     }
   };
 
@@ -189,15 +238,20 @@ const MovieDetail = ({navigation, route}) => {
               <Button
                 style={{marginVertical: 4, borderRadius: 8}}
                 mode="contained-tonal"
-                disabled={
-                  !movie.id ||
-                  (download &&
-                    (download.status === 'downloading' || download.status === 'queued'))
-                }
-                onPress={startDownload}
-                icon={download && download.status === 'completed' ? 'check' : 'download'}>
+                disabled={!movie.id}
+                textColor={theme.colors.onSecondaryContainer}
+                onPress={onDownloadPress}
+                icon={downloadIcon()}>
                 {downloadLabel()}
               </Button>
+              {download &&
+              (download.status === 'downloading' ||
+                download.status === 'paused') ? (
+                <ProgressBar
+                  progress={percent / 100}
+                  style={{marginHorizontal: 4, height: 3, borderRadius: 2}}
+                />
+              ) : null}
             </View>
           </View>
 

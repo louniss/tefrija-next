@@ -66,6 +66,21 @@ const VideoPlayerScreen = ({route}) => {
         return;
       }
       const id = imdbId.split('tt')[1];
+
+      // Local first: a subtitle seen before is on disk, so playback never waits
+      // on the subtitle service (which is unreachable offline anyway).
+      const local = await subtitleManager.getLocalSubtitleForMedia(
+        id,
+        selectedLang,
+        subtitleNumber,
+      );
+      if (local) {
+        setSubtitleReader(
+          new SubtitleReader(local.utf8Data || local.arabicData || ''),
+        );
+        return;
+      }
+
       const subs = await subtitleManager.fetchSubtitleLinks(id, selectedLang);
 
       let num = subtitleNumber;
@@ -77,10 +92,16 @@ const VideoPlayerScreen = ({route}) => {
       if (subs.length > 0) {
         const subText = await subtitleManager.subtitleUrlToText(subs[num]);
 
-        if (subText.utf8Data) {
-          setSubtitleReader(new SubtitleReader(subText.utf8Data));
-        } else if (subText.arabicData) {
-          setSubtitleReader(new SubtitleReader(subText.arabicData));
+        if (subText && (subText.utf8Data || subText.arabicData)) {
+          setSubtitleReader(
+            new SubtitleReader(subText.utf8Data || subText.arabicData),
+          );
+          await subtitleManager.saveLocalSubtitleForMedia(
+            id,
+            selectedLang,
+            num,
+            subText,
+          );
         }
       }
     }
