@@ -8,7 +8,12 @@ import {
   buildGhostMasterPlaylist,
   buildGhostMediaPlaylist,
 } from './playlists';
-import {ensureSegment, loadRecord, segmentPath} from './manager';
+import {
+  cachedIndices,
+  ensureSegment,
+  loadRecord,
+  segmentPath,
+} from './manager';
 
 /**
  * Local HTTP server the video player talks to.
@@ -89,9 +94,25 @@ const handle = async request => {
     return notFound(`unknown quality ${parts[2]}`);
   }
 
+  /* An item with a download entry is served from disk only: its playback must
+   * not depend on the CDN (a paused or interrupted download still has to play
+   * offline). Only the chunks that are here are listed, so the player never
+   * asks for one that would have to be fetched. Streaming (no download entry)
+   * keeps fetching on demand, which is also what fills the cache in the first
+   * place. */
+  const download = useStreamStore.getState().downloads[key];
+  const cached = download ? await cachedIndices(record, variant) : null;
+
   // /s/<key>/<variant>/playlist.m3u8
   if (parts[3] === 'playlist.m3u8') {
     const missing = new Set(variant.missing || []);
+    if (cached && cached.size) {
+      variant.segments.forEach((_, index) => {
+        if (!cached.has(index)) {
+          missing.add(index);
+        }
+      });
+    }
     return textResponse(
       buildGhostMediaPlaylist(
         variant,
@@ -108,7 +129,9 @@ const handle = async request => {
   const index = parseInt(parts[3], 10);
   if (!isNaN(index)) {
     try {
-      await ensureSegment(record, variantIndex, index);
+      if (!download) {
+        await ensureSegment(record, variantIndex, index);
+      }
       const b64 = await RNFS.readFile(
         segmentPath(key, variant, index),
         'base64',

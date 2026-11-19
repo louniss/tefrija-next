@@ -11,6 +11,7 @@ import SubtitleManager from '../../SubtitleManager';
 import {ensureStreamServer} from '../../stream/server';
 import {
   chunksComplete,
+  hasLocalChunks,
   loadRecord,
   localVariantUrl,
   prepareStream,
@@ -129,25 +130,49 @@ const VideoPlayerScreen = ({route}) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [injectedStream]);
 
-  // A fully cached item plays from disk: no resolver, no network.
+  /* A download (finished, paused or still running) always plays from disk: the
+   * local server serves only the chunks that are already here, so playback does
+   * not need the provider at all. Items that were merely streamed go through
+   * the resolver, which is also what fills the cache for a later download. */
   const [offlineRecord, setOfflineRecord] = useState(null);
+  // The resolver is only mounted once we know there is nothing local to play;
+  // otherwise every playback of a download would still start a remote resolve.
+  const [localChecked, setLocalChecked] = useState(false);
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const stored =
-        useStreamStore.getState().streams[mediaKey] ||
-        (await loadRecord(mediaKey));
+      const store = useStreamStore.getState();
+      const stored = store.streams[mediaKey] || (await loadRecord(mediaKey));
       if (cancelled) {
         return;
       }
       if (!stored) {
         setOfflineRecord(null);
+        setLocalChecked(true);
         return;
       }
       const variant = stored.downloadedVariant ?? stored.defaultVariant;
-      const complete = await chunksComplete(stored, variant);
+      const download = store.downloads[mediaKey];
+      if (!download) {
+        setOfflineRecord(null);
+        setLocalChecked(true);
+        return;
+      }
+      const [complete, some] = await Promise.all([
+        chunksComplete(stored, variant),
+        hasLocalChunks(stored, variant),
+      ]);
       if (!cancelled) {
-        setOfflineRecord(complete ? stored : null);
+        if (some) {
+          console.log(
+            'local playback',
+            mediaKey,
+            complete ? 'complete' : 'partial',
+            download.status,
+          );
+        }
+        setOfflineRecord(some ? stored : null);
+        setLocalChecked(true);
       }
     })();
     return () => {
@@ -164,7 +189,7 @@ const VideoPlayerScreen = ({route}) => {
       'quality',
       record.variants[variant].resolution || 'single',
       'from',
-      record.downloadedVariant != null ? 'disk' : 'cache',
+      useStreamStore.getState().downloads[record.key] ? 'disk' : 'cache',
     );
     setPlayerQualities(
       record.variants
@@ -225,7 +250,7 @@ const VideoPlayerScreen = ({route}) => {
         setSubtitleNumber={setSubtitleNumber}
       />
 
-      {!offlineRecord && !injectedStream && (
+      {localChecked && !offlineRecord && !injectedStream && (
         <FetchVideoComponent
           key={`resolver-${resolverAttempt}`}
           id={id}

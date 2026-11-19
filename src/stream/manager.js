@@ -140,6 +140,16 @@ export const cachedIndices = async (record, variant) => {
  * True when every chunk of a quality is already on disk, i.e. the item can be
  * played with no network at all.
  */
+/** True when at least one chunk of the quality is on disk. */
+export const hasLocalChunks = async (record, variantIndex) => {
+  const variant = record && record.variants && record.variants[variantIndex];
+  if (!variant) {
+    return false;
+  }
+  const cached = await cachedIndices(record, variant);
+  return cached.size > 0;
+};
+
 export const chunksComplete = async (record, variantIndex) => {
   const variant = record && record.variants && record.variants[variantIndex];
   if (!variant || !variant.segments.length) {
