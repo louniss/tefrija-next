@@ -149,11 +149,11 @@ const MovieDetail = ({navigation, route}) => {
   };
 
   const handleBack = () => {
-    if (route?.params?.fromSearch) {
-      navigation.navigate('Search');
-    } else {
+    if (navigation.canGoBack()) {
       navigation.goBack();
+      return;
     }
+    navigation.navigate('Home');
   };
 
   if (isTablet) {

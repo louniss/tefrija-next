@@ -59,6 +59,19 @@ const InitialHome = () => {
   );
 };
 
+/* Search has its own stack: details opened from a result are pushed here, so
+ * their back arrow pops back to the results instead of switching the drawer to
+ * Home (which used to bounce between Search and the detail screen). */
+const SearchStackNav = createNativeStackNavigator();
+
+const SearchStack = () => (
+  <SearchStackNav.Navigator screenOptions={{headerShown: false}}>
+    <SearchStackNav.Screen name="Search" component={SearchScreen} />
+    <SearchStackNav.Screen name="MovieDetail" component={MovieDetail} />
+    <SearchStackNav.Screen name="SerieDetail" component={SerieDetails} />
+  </SearchStackNav.Navigator>
+);
+
 const CustomDrawerContent = props => {
   return (
     <DrawerContentScrollView {...props} contentContainerStyle={{paddingTop: 8, flex: 1, backgroundColor: '#181818'}}>
@@ -149,7 +162,7 @@ const Main = () => {
               />
             ),
           }}
-          component={SearchScreen}
+          component={SearchStack}
         />
         <Drawer.Screen
           name="Downloads"

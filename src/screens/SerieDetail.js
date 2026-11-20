@@ -77,11 +77,11 @@ const SerieDetails = ({ navigation, route }) => {
   const { isTablet } = useResponsive();
 
   const handleBack = () => {
-    if (route?.params?.fromSearch) {
-      navigation.navigate('Search');
-    } else {
+    if (navigation.canGoBack()) {
       navigation.goBack();
+      return;
     }
+    navigation.navigate('Home');
   };
 
   // Load show overview (seasons) when serie changes

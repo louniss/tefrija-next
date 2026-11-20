@@ -352,9 +352,9 @@ const SearchScreen = () => {
           }}
           onPressItem={item => {
             if (item.type === 'movie') {
-              navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
+              navigation.navigate('MovieDetail', { movie: item, id: item.id });
             } else {
-              navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item, fromSearch: true } });
+              navigation.navigate('SerieDetail', { serie: item, id: item.id });
             }
           }}
         />
