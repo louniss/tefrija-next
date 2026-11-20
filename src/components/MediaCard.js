@@ -10,6 +10,7 @@ export const MediaCard = ({
   isTablet = false,
   showTypeBadge = true,
   onPress,
+  cardMargin = 6,
 }) => {
   const navigation = useNavigation();
   const [imageError, setImageError] = useState(false);
@@ -62,8 +63,12 @@ export const MediaCard = ({
     <Pressable
       onPress={handlePress}
       style={({ pressed }) => [
-        styles.container,
-        { width, opacity: pressed ? 0.88 : 1, transform: [{ scale: pressed ? 0.97 : 1 }] },
+        {
+          width,
+          margin: cardMargin,
+          opacity: pressed ? 0.88 : 1,
+          transform: [{scale: pressed ? 0.97 : 1}],
+        },
       ]}>
       <View style={[styles.cardSurface, { width }]}>
         {/* Poster Image Container */}
@@ -122,9 +127,6 @@ export const MediaCard = ({
 };
 
 const styles = StyleSheet.create({
-  container: {
-    margin: 6,
-  },
   cardSurface: {
     borderRadius: 12,
     backgroundColor: '#1c1c1e',

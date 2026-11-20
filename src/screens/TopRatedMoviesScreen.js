@@ -1,12 +1,11 @@
 import * as React from 'react';
 import {View} from 'react-native';
-import {FlatGrid} from 'react-native-super-grid';
 import {useNavigation} from '@react-navigation/native';
 
 import {moviedb} from '../movieDb';
 import {Headline, IconButton} from 'react-native-paper';
 import useResponsive from '../utils/useResponsive';
-import MediaCard from '../components/MediaCard';
+import MediaGrid from '../components/MediaGrid';
 
 const TopRatedMoviesScreen = () => {
   const [movies, setMovies] = React.useState([]);
@@ -56,13 +55,7 @@ const TopRatedMoviesScreen = () => {
           Top Rated Movies
         </Headline>
       </View>
-      <FlatGrid
-        onEndReached={fetchMore}
-        itemDimension={isTablet ? 180 : 130}
-        data={movies}
-        spacing={isTablet ? 14 : 8}
-        renderItem={({item}) => <MediaCard item={{...item, type: 'movie'}} isTablet={isTablet} />}
-      />
+      <MediaGrid data={movies} type="movie" onEndReached={fetchMore} />
     </View>
   );
 };

@@ -1,11 +1,10 @@
 import * as React from 'react';
 import { View, Pressable, ScrollView } from 'react-native';
-import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { moviedb } from '../movieDb';
 import { Button, Headline, IconButton, Text, ActivityIndicator } from 'react-native-paper';
 import useResponsive from '../utils/useResponsive';
-import MediaCard from '../components/MediaCard';
+import MediaGrid from '../components/MediaGrid';
 
 const MoviesShowsByGenre = () => {
   const navigation = useNavigation();
@@ -164,13 +163,8 @@ const MoviesShowsByGenre = () => {
           <ActivityIndicator animating color="#E50914" size="large" />
         </View>
       ) : (
-        <FlatGrid
+        <MediaGrid
           data={results}
-          itemDimension={isTablet ? 180 : 130}
-          spacing={isTablet ? 14 : 8}
-          renderItem={({ item }) => (
-            <MediaCard item={item} isTablet={isTablet} />
-          )}
           onEndReached={() => {
             if (loading) return;
             if (totalPages != null && page >= totalPages) return;

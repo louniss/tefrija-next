@@ -5,10 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, IconButton, ActivityIndicator } from 'react-native-paper';
 import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
 import { MovieDb } from 'moviedb-promise';
-import { FlatGrid } from 'react-native-super-grid';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import useResponsive from '../utils/useResponsive';
-import MediaCard from '../components/MediaCard';
+import MediaGrid from '../components/MediaGrid';
 import MobileBottomNav from '../components/MobileBottomNav';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
 
@@ -332,7 +331,7 @@ const SearchScreen = () => {
           )}
         </View>
       ) : searchResults.length > 0 ? (
-        <FlatGrid
+        <MediaGrid
           data={searchResults}
           onEndReached={() => {
             console.log('[onEndReached] fired', { page, totalPages, searchLoading, searchQuery });
@@ -351,22 +350,13 @@ const SearchScreen = () => {
               return next;
             });
           }}
-          renderItem={({ item }) => (
-            <MediaCard
-              item={item}
-              isTablet={isTablet}
-              onPress={() => {
-                if (item.type === 'movie') {
-                  navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
-                } else {
-                  navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item, fromSearch: true } });
-                }
-              }}
-            />
-          )}
-          itemDimension={isTablet ? 180 : 130}
-          spacing={isTablet ? 14 : 8}
-          contentContainerStyle={{ alignContent: 'center' }}
+          onPressItem={item => {
+            if (item.type === 'movie') {
+              navigation.navigate('Home', { screen: 'MovieDetail', params: { movie: item, fromSearch: true } });
+            } else {
+              navigation.navigate('Home', { screen: 'SerieDetail', params: { serie: item, fromSearch: true } });
+            }
+          }}
         />
       ) : (
         <View style={{ padding: 30, alignItems: 'center', justifyContent: 'center' }}>
