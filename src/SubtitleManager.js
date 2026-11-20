@@ -185,6 +185,7 @@ class SubtitleManager {
   async fetchSubtitleLinks(imdbId, lang) {
     const url = `https://rest.opensubtitles.org/search/imdbid-${imdbId}/sublanguageid-${lang}`;
     const cacheKey = `${LINKS_PREFIX}${imdbId}-${lang}`;
+    console.log('fetching subtitle links', url);
     try {
       const response = await axios.get(url, {
         headers: {
@@ -203,10 +204,15 @@ class SubtitleManager {
         fileName: item.SubFileName,
         downloads: item.SubDownloadsCnt,
       }));
+      console.log('subtitle links', imdbId, lang, links.length);
       AsyncStorage.setItem(cacheKey, JSON.stringify(links)).catch(() => {});
       return links;
     } catch (error) {
-      console.error('fetchSubtitleLinks error: ', error);
+      console.error(
+        'fetchSubtitleLinks error: ',
+        url,
+        error && (error.message || error),
+      );
       try {
         const cached = await AsyncStorage.getItem(cacheKey);
         if (cached) {

@@ -577,7 +577,7 @@ export const MainScreen = () => {
             <Carousel
               data={movies.slice(0, 10)}
               width={contentWidth}
-              height={450}
+              height={420}
               autoPlay={false}
               panGestureHandlerProps={{
                 activeOffsetX: [-10, 20],

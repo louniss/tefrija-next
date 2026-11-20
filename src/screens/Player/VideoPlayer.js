@@ -18,7 +18,8 @@ import {
 } from '../../stream/manager';
 import useStreamStore, {streamKey} from '../../stream/store';
 import {invalidateFlow} from '../../components/resolveFlow';
-import {loadSubtitleTrack} from '../../stream/subtitles';
+import {moviedb} from '../../movieDb';
+import {loadSubtitleTrack, resolveImdbId} from '../../stream/subtitles';
 
 import Player from './Player';
 
@@ -61,6 +62,27 @@ const VideoPlayerScreen = ({route}) => {
   const [season, setSeason] = useState(route.params.season);
   const [episode, setEpisode] = useState(route.params.episode);
 
+  /* Subtitles are looked up by imdb id, but most entry points (the home rows,
+   * downloads) only know the TMDB id, so resolve the missing one here instead
+   * of asking every call site to carry it. */
+  useEffect(() => {
+    if (imdbId || !id) {
+      return undefined;
+    }
+    let cancelled = false;
+
+    resolveImdbId({db: moviedb, type, id, season, episode}).then(resolved => {
+      if (!cancelled && resolved) {
+        console.log('resolved imdb id', resolved, 'for', type, id);
+        setImdbId(resolved);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [imdbId, id, type, season, episode]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -79,12 +101,14 @@ const VideoPlayerScreen = ({route}) => {
 
     if (imdbId) {
       fetchSubtitle();
+    } else {
+      console.log('no imdb id for', type, id, '- subtitles skipped');
     }
 
     return () => {
       cancelled = true;
     };
-  }, [selectedLang, imdbId, id, subtitleNumber]);
+  }, [selectedLang, imdbId, id, subtitleNumber, type]);
 
   useEffect(() => {
     setId(route.params.id);

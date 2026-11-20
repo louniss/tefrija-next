@@ -2,7 +2,7 @@
  * @format
  */
 
-import {loadSubtitleTrack} from '../src/stream/subtitles';
+import {loadSubtitleTrack, resolveImdbId} from '../src/stream/subtitles';
 
 const sub = {utf8Data: 'remote text', arabicData: 'remote arabic'};
 
@@ -122,5 +122,46 @@ describe('loadSubtitleTrack', () => {
       'ara',
       0,
     );
+  });
+});
+
+describe('resolveImdbId', () => {
+  it('looks the imdb id up for a movie', async () => {
+    const db = {movieExternalIds: jest.fn(async () => ({imdb_id: 'tt42'}))};
+
+    await expect(resolveImdbId({db, type: 'movie', id: 42})).resolves.toBe(
+      'tt42',
+    );
+    expect(db.movieExternalIds).toHaveBeenCalledWith({id: 42});
+  });
+
+  it('uses the episode ids for a series episode', async () => {
+    const db = {episodeExternalIds: jest.fn(async () => ({imdb_id: 'tt7'}))};
+
+    await expect(
+      resolveImdbId({db, type: 'tv', id: 7, season: 1, episode: 3}),
+    ).resolves.toBe('tt7');
+    expect(db.episodeExternalIds).toHaveBeenCalledWith({
+      id: 7,
+      season_number: 1,
+      episode_number: 3,
+    });
+  });
+
+  it('falls back to the show ids when there is no episode', async () => {
+    const db = {tvExternalIds: jest.fn(async () => ({imdb_id: 'tt9'}))};
+
+    await expect(resolveImdbId({db, type: 'tv', id: 9})).resolves.toBe('tt9');
+    expect(db.tvExternalIds).toHaveBeenCalledWith({id: 9});
+  });
+
+  it('returns null when the lookup fails', async () => {
+    const db = {
+      movieExternalIds: jest.fn(async () => {
+        throw new Error('offline');
+      }),
+    };
+
+    await expect(resolveImdbId({db, type: 'movie', id: 1})).resolves.toBeNull();
   });
 });
