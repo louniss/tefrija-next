@@ -18,6 +18,7 @@ import {
 } from '../../stream/manager';
 import useStreamStore, {streamKey} from '../../stream/store';
 import {invalidateFlow} from '../../components/resolveFlow';
+import {loadSubtitleTrack} from '../../stream/subtitles';
 
 import Player from './Player';
 
@@ -61,51 +62,28 @@ const VideoPlayerScreen = ({route}) => {
   const [episode, setEpisode] = useState(route.params.episode);
 
   useEffect(() => {
+    let cancelled = false;
+
     async function fetchSubtitle() {
-      if (!imdbId) {
+      const {text} = await loadSubtitleTrack({
+        manager: subtitleManager,
+        imdbId,
+        lang: selectedLang,
+        track: subtitleNumber,
+      });
+      if (cancelled || !text) {
         return;
       }
-      const id = imdbId.split('tt')[1];
-
-      // Local first: a subtitle seen before is on disk, so playback never waits
-      // on the subtitle service (which is unreachable offline anyway).
-      const local = await subtitleManager.getLocalSubtitleForMedia(
-        id,
-        selectedLang,
-        subtitleNumber,
-      );
-      if (local) {
-        setSubtitleReader(
-          new SubtitleReader(local.utf8Data || local.arabicData || ''),
-        );
-        return;
-      }
-
-      const subs = await subtitleManager.fetchSubtitleLinks(id, selectedLang);
-
-      let num = subtitleNumber;
-
-      if (subs.length <= subtitleNumber) {
-        num = subs.length - 1;
-      }
-
-      if (subs.length > 0) {
-        const subText = await subtitleManager.subtitleUrlToText(subs[num]);
-
-        if (subText && (subText.utf8Data || subText.arabicData)) {
-          setSubtitleReader(
-            new SubtitleReader(subText.utf8Data || subText.arabicData),
-          );
-          await subtitleManager.saveLocalSubtitleForMedia(
-            id,
-            selectedLang,
-            num,
-            subText,
-          );
-        }
-      }
+      setSubtitleReader(new SubtitleReader(text));
     }
-    fetchSubtitle();
+
+    if (imdbId) {
+      fetchSubtitle();
+    }
+
+    return () => {
+      cancelled = true;
+    };
   }, [selectedLang, imdbId, id, subtitleNumber]);
 
   useEffect(() => {
