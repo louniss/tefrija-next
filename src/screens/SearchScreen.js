@@ -16,6 +16,8 @@ const SearchScreen = () => {
   const refSearchBox = React.useRef();
   const [searchResults, setSearchResults] = React.useState([]);
   const [searchLoading, setSearchLoading] = React.useState(false);
+  const [loadingMore, setLoadingMore] = React.useState(false);
+  const loadingMoreRef = React.useRef(false);
   const [hasSearched, setHasSearched] = React.useState(false);
   const [suggestion, setSuggestion] = React.useState(null);
   const [suggestionLoading, setSuggestionLoading] = React.useState(false);
@@ -23,22 +25,23 @@ const SearchScreen = () => {
   const [page, setPage] = React.useState(1);
   const [totalPages, setTotalPages] = React.useState(null);
   const [totalResults, setTotalResults] = React.useState(null);
-  const flatRef = React.useRef(null);
-  const [scrollOffset, setScrollOffset] = React.useState(0);
   const [lastQuery, setLastQuery] = React.useState('');
 
   const navigation = useNavigation();
   const { isTablet } = useResponsive();
 
-  const search = async (reset, overridePage, overrideQuery) => {
-    const p = overridePage ?? page;
-    const q = overrideQuery ?? searchQuery;
-    console.log('[search] start', { reset, overridePage, overrideQuery, usingPage: p, usingQuery: q, statePage: page, stateQuery: searchQuery });
+  const search = async overrideQuery => {
+    const q = (overrideQuery ?? searchQuery).trim();
+    if (!q) {
+      return;
+    }
+    console.log('[search] start fresh search', { query: q });
     setSearchLoading(true);
+    setPage(1);
     try {
       const res = await moviedb.searchMulti({
         query: q,
-        page: p,
+        page: 1,
       });
 
       console.log('[search] tmdb response meta', {
@@ -48,17 +51,8 @@ const SearchScreen = () => {
       });
       setTotalPages(res.total_pages || 1);
       setTotalResults(res.total_results || 0);
-      if (res.results && res.results.length) {
-        const types = res.results.reduce((acc, it) => {
-          acc[it.media_type] = (acc[it.media_type] || 0) + 1;
-          return acc;
-        }, {});
-        console.log('[search] tmdb result media types sample', types, 'sampleIds', res.results.slice(0,5).map(r=>({id:r.id, type:r.media_type, title:r.title||r.name}))); 
-      } else {
-        console.log('[search] tmdb returned no raw results for this page');
-      }
 
-      const r = res.results
+      const r = (res.results || [])
         .map(item => {
           if (item.media_type === 'person') {
             return false;
@@ -81,28 +75,92 @@ const SearchScreen = () => {
         })
         .filter(Boolean);
 
-      if (reset) {
-        console.log('[search] reset results length', r.length);
-        setSearchResults(r);
-      } else {
-        console.log('[search] append results length', r.length);
-        setSearchResults(prev => [...prev, ...r]);
-        // After appending, restore previous scroll offset to avoid jump-to-top
-        setTimeout(() => {
-          try {
-            if (flatRef.current && typeof flatRef.current.scrollToOffset === 'function') {
-              console.log('[search] restoring scroll offset', scrollOffset);
-              flatRef.current.scrollToOffset({ offset: scrollOffset, animated: false });
-            }
-          } catch (e) {
-            console.warn('[search] failed to restore scroll offset', e && (e.message || e));
-          }
-        }, 50);
+      const seen = new Set();
+      const unique = [];
+      for (const it of r) {
+        const key = `${it.type}-${it.id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push(it);
+        }
       }
+      console.log('[search] unique results count', unique.length);
+      setSearchResults(unique);
     } catch (e) {
       console.error('[search] error', e && (e.message || e), e && e.stack ? e.stack : e);
     } finally {
       setSearchLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (loadingMoreRef.current || searchLoading) {
+      console.log('[loadMore] skipping: already loading', {
+        loadingMore: loadingMoreRef.current,
+        searchLoading,
+      });
+      return;
+    }
+    if (totalPages != null && page >= totalPages) {
+      console.log('[loadMore] no more pages', { page, totalPages });
+      return;
+    }
+    const q = (searchQuery || lastQuery || '').trim();
+    if (!q) {
+      return;
+    }
+
+    const nextPage = page + 1;
+    console.log('[loadMore] fetching next page', { nextPage, query: q });
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const res = await moviedb.searchMulti({
+        query: q,
+        page: nextPage,
+      });
+
+      setTotalPages(res.total_pages || 1);
+      setTotalResults(res.total_results || 0);
+
+      const r = (res.results || [])
+        .map(item => {
+          if (item.media_type === 'person') {
+            return false;
+          }
+          const poster = item.poster_path || item.backdrop_path || null;
+          return {
+            id: item.id,
+            title: item.title || item.name,
+            poster_path: item.poster_path,
+            vote_average: item.vote_average,
+            image: poster
+              ? `https://image.tmdb.org/t/p/w500/${poster}`
+              : 'https://t3.ftcdn.net/jpg/02/68/55/60/360_F_268556012_c1WBaKFN5rjRxR2eyV33znK4qnYeKZjm.jpg',
+            type: item.media_type,
+            year:
+              item.release_date?.split('-')[0] ||
+              item.first_air_date?.split('-')[0],
+            rate: item.vote_average,
+          };
+        })
+        .filter(Boolean);
+
+      setSearchResults(prev => {
+        const existingKeys = new Set(prev.map(it => `${it.type}-${it.id}`));
+        const newItems = r.filter(it => !existingKeys.has(`${it.type}-${it.id}`));
+        console.log('[loadMore] appending items', {
+          prevCount: prev.length,
+          newCount: newItems.length,
+        });
+        return [...prev, ...newItems];
+      });
+      setPage(nextPage);
+    } catch (e) {
+      console.error('[loadMore] error', e && (e.message || e));
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
     }
   };
   // Open search box when screen mounts
@@ -240,17 +298,14 @@ const SearchScreen = () => {
               if (text.trim().length === 0) {
                 setSearchResults([]);
                 setPage(1);
+                setTotalPages(null);
+                setTotalResults(null);
               }
             }}
             onSubmitEditing={async () => {
-              const isNew = lastQuery !== searchQuery;
-              setPage(1);
               setHasSearched(true);
               setLastQuery(searchQuery);
-              // If query changed, reset results; otherwise append
-              const reset = isNew;
-              // Run TMDB search and suggestion fetch in parallel
-              await Promise.all([search(reset, 1, searchQuery), fetchSuggestion(searchQuery)]);
+              await Promise.all([search(searchQuery), fetchSuggestion(searchQuery)]);
             }}
             onOpened={() => { }}
           />
@@ -261,13 +316,10 @@ const SearchScreen = () => {
         <View style={{ paddingHorizontal: 12, paddingTop: 8 }}>
           <Pressable
             onPress={async () => {
-              const isNew = lastQuery !== suggestion;
               setSearchQuery(suggestion);
               setHasSearched(true);
-              setPage(1);
               setLastQuery(suggestion);
-              const reset = isNew;
-              await Promise.all([search(reset, 1, suggestion), fetchSuggestion(suggestion)]);
+              await Promise.all([search(suggestion), fetchSuggestion(suggestion)]);
             }}
             style={{ padding: 8 }}>
             <Text style={{ color: '#aaa' }}>See also <Text style={{ color: '#E50914', fontWeight: 'bold' }}>{suggestion}</Text>?</Text>
@@ -295,13 +347,10 @@ const SearchScreen = () => {
               </Text>
               <Pressable
                 onPress={async () => {
-                  const isNew = lastQuery !== suggestion;
                   setSearchQuery(suggestion);
                   setHasSearched(true);
-                  setPage(1);
                   setLastQuery(suggestion);
-                  const reset = isNew;
-                  await search(reset, 1, suggestion);
+                  await search(suggestion);
                 }}
                 style={{ padding: 8 }}>
                 <Text style={{ fontSize: 18, color: '#E50914', fontWeight: 'bold' }}>{suggestion}</Text>
@@ -311,12 +360,9 @@ const SearchScreen = () => {
               </Text>
               <Pressable
                 onPress={async () => {
-                  const isNew = lastQuery !== searchQuery;
                   setHasSearched(true);
-                  setPage(1);
                   setLastQuery(searchQuery);
-                  const reset = isNew;
-                  await search(reset, 1, searchQuery);
+                  await search(searchQuery);
                 }}
                 style={{ padding: 8 }}>
                 <Text style={{ color: '#aaa' }}>Search</Text>
@@ -333,23 +379,15 @@ const SearchScreen = () => {
       ) : searchResults.length > 0 ? (
         <MediaGrid
           data={searchResults}
-          onEndReached={() => {
-            console.log('[onEndReached] fired', { page, totalPages, searchLoading, searchQuery });
-            if (searchLoading) {
-              console.log('[onEndReached] aborting because searchLoading=true');
-              return;
-            }
-            if (totalPages != null && page >= totalPages) {
-              console.log('[onEndReached] no more pages (page>=totalPages)', { page, totalPages });
-              return;
-            }
-            setPage(prev => {
-              const next = prev + 1;
-              console.log('[onEndReached] setPage prev/next', { prev, next });
-              search(false, next, searchQuery);
-              return next;
-            });
-          }}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          ListFooterComponent={
+            loadingMore ? (
+              <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+                <ActivityIndicator animating={true} color="#E50914" />
+              </View>
+            ) : null
+          }
           onPressItem={item => {
             if (item.type === 'movie') {
               navigation.navigate('MovieDetail', { movie: item, id: item.id });

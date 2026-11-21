@@ -13,6 +13,7 @@ const MediaGrid = React.forwardRef(
       onPressItem,
       ListEmptyComponent,
       ListFooterComponent,
+      keyExtractor,
       ...rest
     },
     ref,
@@ -39,7 +40,13 @@ const MediaGrid = React.forwardRef(
           {...rest}
           data={data}
           numColumns={layout.columns}
-          keyExtractor={(item, index) => String(item?.id ?? index)}
+          keyExtractor={
+            keyExtractor ||
+            ((item, index) =>
+              item?.type && item?.id
+                ? `${item.type}-${item.id}`
+                : String(item?.id ?? index))
+          }
           columnWrapperStyle={
             layout.columns > 1
               ? {gap: layout.gap, justifyContent: 'center'}
