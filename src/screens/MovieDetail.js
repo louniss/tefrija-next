@@ -72,6 +72,10 @@ const MovieDetail = ({navigation, route}) => {
       ? Math.min(100, Math.round((download.done / download.total) * 100))
       : 0;
 
+  const isPending =
+    download &&
+    (download.status === 'downloading' || download.status === 'queued');
+
   const downloadLabel = () => {
     if (!download) {
       return 'Download';
@@ -237,19 +241,28 @@ const MovieDetail = ({navigation, route}) => {
                 Play
               </Button>
               <Button
-                style={{marginVertical: 4, borderRadius: 8}}
+                style={{
+                  marginVertical: 4,
+                  borderRadius: 8,
+                  borderWidth: isPending ? 1 : 0,
+                  borderColor: isPending ? 'rgba(229, 9, 20, 0.5)' : 'transparent',
+                }}
                 mode="contained-tonal"
+                buttonColor={isPending ? 'rgba(229, 9, 20, 0.25)' : 'rgba(255, 255, 255, 0.15)'}
                 disabled={!movie.id}
-                textColor={theme.colors.onSecondaryContainer}
+                textColor="#ffffff"
+                labelStyle={{color: '#ffffff', fontWeight: 'bold'}}
                 onPress={onDownloadPress}
                 icon={downloadIcon()}>
                 {downloadLabel()}
               </Button>
               {download &&
               (download.status === 'downloading' ||
-                download.status === 'paused') ? (
+                download.status === 'paused' ||
+                download.status === 'queued') ? (
                 <ProgressBar
-                  progress={percent / 100}
+                  progress={download.status === 'queued' ? 0 : percent / 100}
+                  color="#E50914"
                   style={{marginHorizontal: 4, height: 3, borderRadius: 2}}
                 />
               ) : null}
@@ -465,21 +478,33 @@ const MovieDetail = ({navigation, route}) => {
 
           <Button
             mode="contained-tonal"
-            icon={download && download.status === 'completed' ? 'check' : 'download'}
-            buttonColor="rgba(255,255,255,0.15)"
+            icon={downloadIcon()}
+            buttonColor={isPending ? 'rgba(229, 9, 20, 0.25)' : 'rgba(255, 255, 255, 0.15)'}
             textColor="#ffffff"
-            disabled={
-              !movie.id ||
-              (download &&
-                (download.status === 'downloading' || download.status === 'queued'))
-            }
-            onPress={startDownload}
-            style={{flex: 1, borderRadius: 10}}
+            disabled={!movie.id}
+            onPress={onDownloadPress}
+            style={{
+              flex: 1,
+              borderRadius: 10,
+              borderWidth: isPending ? 1 : 0,
+              borderColor: isPending ? 'rgba(229, 9, 20, 0.5)' : 'transparent',
+            }}
             contentStyle={{height: 44}}
-            labelStyle={{fontWeight: 'bold', fontSize: 14}}>
+            labelStyle={{fontWeight: 'bold', fontSize: 14, color: '#ffffff'}}>
             {downloadLabel()}
           </Button>
         </View>
+
+        {download &&
+        (download.status === 'downloading' ||
+          download.status === 'paused' ||
+          download.status === 'queued') ? (
+          <ProgressBar
+            progress={download.status === 'queued' ? 0 : percent / 100}
+            color="#E50914"
+            style={{height: 3, borderRadius: 2, marginBottom: 14}}
+          />
+        ) : null}
 
         {/* Genre pills */}
         {movie.genres && movie.genres.length > 0 ? (
