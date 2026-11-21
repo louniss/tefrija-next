@@ -18,6 +18,7 @@ import useMainState from '../state/Main';
 import useStreamStore, {streamKey} from '../stream/store';
 import Animated from 'react-native-reanimated';
 import useResponsive from '../utils/useResponsive';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MovieDetail = ({navigation, route}) => {
   const [movie, setMovie] = React.useState({});
@@ -316,10 +317,11 @@ const MovieDetail = ({navigation, route}) => {
   const runtimeStr = movie.runtime ? `${Math.floor(movie.runtime / 60)}h ${movie.runtime % 60}m` : null;
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      style={{flex: 1, backgroundColor: '#121212'}}
-      contentContainerStyle={{paddingBottom: 40, backgroundColor: '#121212'}}>
+    <SafeAreaView style={{flex: 1, backgroundColor: '#121212'}} edges={['top', 'left', 'right']}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        style={{flex: 1, backgroundColor: '#121212'}}
+        contentContainerStyle={{paddingBottom: 40, backgroundColor: '#121212'}}>
       {/* Backdrop Header */}
       <View style={{height: 300, width: '100%', position: 'relative', backgroundColor: '#1c1c1e'}}>
         <Image
@@ -522,7 +524,8 @@ const MovieDetail = ({navigation, route}) => {
         </View>
       </View>
     </ScrollView>
-  );
+  </SafeAreaView>
+);
 };
 
 const styles = {

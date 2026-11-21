@@ -5,6 +5,7 @@ import { moviedb } from '../movieDb';
 import { Button, Headline, IconButton, Text, ActivityIndicator } from 'react-native-paper';
 import useResponsive from '../utils/useResponsive';
 import MediaGrid from '../components/MediaGrid';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MoviesShowsByGenre = () => {
   const navigation = useNavigation();
@@ -81,7 +82,7 @@ const MoviesShowsByGenre = () => {
   }, [genre]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#121212' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#121212' }} edges={['top', 'left', 'right']}>
       <View
         style={{
           flexDirection: 'row',
@@ -174,7 +175,7 @@ const MoviesShowsByGenre = () => {
           }}
         />
       )}
-    </View>
+    </SafeAreaView>
   );
 };
 

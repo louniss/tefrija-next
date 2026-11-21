@@ -6,7 +6,7 @@ import {
   DrawerContentScrollView,
   DrawerItemList,
 } from '@react-navigation/drawer';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { IconButton, Text } from 'react-native-paper';
 import { DefaultTheme, DarkTheme, useNavigation } from '@react-navigation/native';
 import SystemNavigationBar from 'react-native-system-navigation-bar';
@@ -74,20 +74,22 @@ const SearchStack = () => (
 
 const CustomDrawerContent = props => {
   return (
-    <DrawerContentScrollView {...props} contentContainerStyle={{paddingTop: 8, flex: 1, backgroundColor: '#181818'}}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          paddingHorizontal: 16,
-          paddingVertical: 14,
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: 'rgba(255,255,255,0.1)',
-          marginBottom: 8,
-        }}>
-        <IconButton icon="movie-outline" iconColor="#E50914" size={26} style={{margin: 0, marginRight: 8}} />
-        <Text style={{fontSize: 20, fontWeight: '900', color: '#E50914', letterSpacing: 1}}>TEFRIJA</Text>
-      </View>
+    <DrawerContentScrollView {...props} contentContainerStyle={{flex: 1, backgroundColor: '#181818'}}>
+      <SafeAreaView edges={['top', 'left']}>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderBottomColor: 'rgba(255,255,255,0.1)',
+            marginBottom: 8,
+          }}>
+          <IconButton icon="movie-outline" iconColor="#E50914" size={26} style={{margin: 0, marginRight: 8}} />
+          <Text style={{fontSize: 20, fontWeight: '900', color: '#E50914', letterSpacing: 1}}>TEFRIJA</Text>
+        </View>
+      </SafeAreaView>
       <DrawerItemList {...props} />
     </DrawerContentScrollView>
   );
@@ -99,8 +101,7 @@ const Main = () => {
   const { isTabletLandscape } = useResponsive();
 
   return (
-    <SafeAreaProvider>
-      <Drawer.Navigator
+    <Drawer.Navigator
         drawerContent={props => <CustomDrawerContent {...props} />}
         screenOptions={({ navigation }) => ({
           headerShown: false,
@@ -214,7 +215,6 @@ const Main = () => {
           }}
         />
       </Drawer.Navigator>
-    </SafeAreaProvider>
   );
 };
 
@@ -233,17 +233,19 @@ const App = () => {
   }, []);
 
   return (
-    <NavigationContainer theme={theme}>
-      <RootStack.Navigator
-        mode="card"
-        headerMode="none"
-        screenOptions={{ headerShown: false }}>
-        <RootStack.Screen name="Main" component={Main} />
-        <RootStack.Screen name="VideoPlayer" component={VideoPlayer} />
-      </RootStack.Navigator>
-      <WebFetchHost />
-      <DownloadHost />
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer theme={theme}>
+        <RootStack.Navigator
+          mode="card"
+          headerMode="none"
+          screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Main" component={Main} />
+          <RootStack.Screen name="VideoPlayer" component={VideoPlayer} />
+        </RootStack.Navigator>
+        <WebFetchHost />
+        <DownloadHost />
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 };
 

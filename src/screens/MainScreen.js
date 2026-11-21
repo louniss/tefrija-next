@@ -19,6 +19,7 @@ import Animated from 'react-native-reanimated';
 import useResponsive from '../utils/useResponsive';
 import MediaCard from '../components/MediaCard';
 import MobileBottomNav from '../components/MobileBottomNav';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const MobileHeroCard = ({ item }) => {
   const navigation = useNavigation();
@@ -522,7 +523,7 @@ export const MainScreen = () => {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#121212' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#121212' }} edges={['top', 'left', 'right']}>
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* Mobile Header (Brand Logo, Drawer, Search) */}
         {!isTabletLandscape && (
@@ -723,6 +724,6 @@ export const MainScreen = () => {
         />
       </ScrollView>
       <MobileBottomNav activeTab="home" />
-    </View>
+    </SafeAreaView>
   );
 };

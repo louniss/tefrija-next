@@ -25,6 +25,7 @@ import {useNavigation} from '@react-navigation/native';
 import SubtitleManager from '../../SubtitleManager';
 import useMainState from '../../state/Main';
 import useResponsive from '../../utils/useResponsive';
+import {SafeAreaInsetsContext} from 'react-native-safe-area-context';
 
 const subtitleManager = new SubtitleManager();
 
@@ -69,6 +70,12 @@ const ExtraControls = ({
   const navigation = useNavigation();
   const state = useMainState();
   const colorScheme = useColorScheme();
+  const insets = React.useContext(SafeAreaInsetsContext) || {
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  };
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeAnim = useRef(new Animated.Value(1)).current;
@@ -405,7 +412,16 @@ const ExtraControls = ({
         pointerEvents={controlsVisible && !isLocked ? 'box-none' : 'none'}
         style={[styles.overlayContainer, {opacity: fadeAnim}]}>
         {/* Top Header Bar */}
-        <View style={styles.topBar} pointerEvents="box-none">
+        <View
+          style={[
+            styles.topBar,
+            {
+              paddingTop: Math.max(insets.top, 16),
+              paddingLeft: Math.max(insets.left, 16),
+              paddingRight: Math.max(insets.right, 16),
+            },
+          ]}
+          pointerEvents="box-none">
           <IconButton
             icon="arrow-left"
             iconColor="#fff"
@@ -433,7 +449,16 @@ const ExtraControls = ({
         )}
 
         {/* Bottom Controls Bar (Netflix Style - Image 1) */}
-        <View style={styles.bottomBar} pointerEvents="box-none">
+        <View
+          style={[
+            styles.bottomBar,
+            {
+              paddingBottom: Math.max(insets.bottom, 12),
+              paddingLeft: Math.max(insets.left, 16),
+              paddingRight: Math.max(insets.right, 16),
+            },
+          ]}
+          pointerEvents="box-none">
           {/* Progress Timeline Row */}
           <View style={styles.timelineRow}>
             <Slider

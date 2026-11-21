@@ -6,6 +6,7 @@ import {moviedb} from '../movieDb';
 import {Headline, IconButton} from 'react-native-paper';
 import useResponsive from '../utils/useResponsive';
 import MediaGrid from '../components/MediaGrid';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const TopRatedMoviesScreen = () => {
   const [movies, setMovies] = React.useState([]);
@@ -42,7 +43,7 @@ const TopRatedMoviesScreen = () => {
   };
 
   return (
-    <View style={{flex: 1, backgroundColor: '#121212'}}>
+    <SafeAreaView style={{flex: 1, backgroundColor: '#121212'}} edges={['top', 'left', 'right']}>
       <View
         style={{
           paddingHorizontal: isTablet ? 16 : 8,
@@ -56,7 +57,7 @@ const TopRatedMoviesScreen = () => {
         </Headline>
       </View>
       <MediaGrid data={movies} type="movie" onEndReached={fetchMore} />
-    </View>
+    </SafeAreaView>
   );
 };
 

@@ -19,6 +19,7 @@ import useStreamStore, {sortDownloads} from '../stream/store';
 import {clearStreamFiles} from '../stream/manager';
 import useResponsive from '../utils/useResponsive';
 import MobileBottomNav from '../components/MobileBottomNav';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const percentOf = item =>
   item.total ? Math.min(100, Math.round((item.done / item.total) * 100)) : 0;
@@ -373,7 +374,7 @@ const DownloadsScreen = ({navigation}) => {
     );
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#121212' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#121212' }} edges={['top', 'left', 'right']}>
       <View
         style={{
           flexDirection: 'row',
@@ -458,7 +459,7 @@ const DownloadsScreen = ({navigation}) => {
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </View>
+    </SafeAreaView>
   );
 };
 

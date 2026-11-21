@@ -8,6 +8,7 @@ import {
   Button,
 } from 'react-native-paper';
 import {Linking, useColorScheme, View} from 'react-native';
+import {SafeAreaProvider} from 'react-native-safe-area-context';
 import App from './src/App';
 import useAppNewVersion from './src/state/AppNewVersion';
 import WebView from 'react-native-webview';
@@ -36,39 +37,41 @@ export default function Main() {
   }, []);
 
   return (
-    <PaperProvider theme={theme}>
-      <App />
-      {updateAvailable && (
-        <Dialog visible={true} dismissable={false}>
-          <Dialog.Title>Update Available</Dialog.Title>
-          <Dialog.Content>
-            <Text>
-              An update is available. Click the button below to update.
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => Linking.openURL(updateUrl)}>
-              Update Now
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-      )}
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <App />
+        {updateAvailable && (
+          <Dialog visible={true} dismissable={false}>
+            <Dialog.Title>Update Available</Dialog.Title>
+            <Dialog.Content>
+              <Text>
+                An update is available. Click the button below to update.
+              </Text>
+            </Dialog.Content>
+            <Dialog.Actions>
+              <Button onPress={() => Linking.openURL(updateUrl)}>
+                Update Now
+              </Button>
+            </Dialog.Actions>
+          </Dialog>
+        )}
 
-      <View
-        style={{
-          position: 'absolute',
-          top: -1000,
-          left: -1000,
-          width: 800,
-          height: 1200,
-        }}>
-        <WebView
-          style={{width: '100%', height: '100%'}}
-          source={{
-            uri: uri,
-          }}
-        />
-      </View>
-    </PaperProvider>
+        <View
+          style={{
+            position: 'absolute',
+            top: -1000,
+            left: -1000,
+            width: 800,
+            height: 1200,
+          }}>
+          <WebView
+            style={{width: '100%', height: '100%'}}
+            source={{
+              uri: uri,
+            }}
+          />
+        </View>
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }

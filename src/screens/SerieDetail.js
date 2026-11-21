@@ -15,6 +15,7 @@ import { moviedb } from '../movieDb';
 import useMainState from '../state/Main';
 import useStreamStore, { streamKey } from '../stream/store';
 import useResponsive from '../utils/useResponsive';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const downloadEpisode = ({
   serie,
@@ -632,16 +633,18 @@ const SerieDetails = ({ navigation, route }) => {
   );
 
   return (
-    <FlatList
-      style={{flex: 1, backgroundColor: '#121212'}}
-      contentContainerStyle={{paddingBottom: 40}}
-      data={episodes}
-      keyExtractor={item => item.id.toString()}
-      ListHeaderComponent={MobileHeader}
-      renderItem={({ item }) => (
-        <EpisodeItem episode={item} s={serie} />
-      )}
-    />
+    <SafeAreaView style={{flex: 1, backgroundColor: '#121212'}} edges={['top', 'left', 'right']}>
+      <FlatList
+        style={{flex: 1, backgroundColor: '#121212'}}
+        contentContainerStyle={{paddingBottom: 40}}
+        data={episodes}
+        keyExtractor={item => item.id.toString()}
+        ListHeaderComponent={MobileHeader}
+        renderItem={({ item }) => (
+          <EpisodeItem episode={item} s={serie} />
+        )}
+      />
+    </SafeAreaView>
   );
 };
 
