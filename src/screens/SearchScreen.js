@@ -1,6 +1,5 @@
 import { Pressable, View } from 'react-native';
 import React from 'react';
-import { jsdom } from 'jsdom-jscore-rn';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, IconButton, ActivityIndicator } from 'react-native-paper';
 import ReactNativeAnimatedSearchbox from 'react-native-animated-searchbox';
@@ -10,6 +9,117 @@ import useResponsive from '../utils/useResponsive';
 import MediaGrid from '../components/MediaGrid';
 import MobileBottomNav from '../components/MobileBottomNav';
 const moviedb = new MovieDb('a2df3d1a7611194432bbdf1fc80540f2');
+
+const STRIP_SUFFIXES = [
+  /\s+cast$/i,
+  /\s+movie(s)?$/i,
+  /\s+tv(\s+(series|show))?$/i,
+  /\s+show$/i,
+  /\s+series$/i,
+  /\s+episodes?$/i,
+  /\s+seasons?(\s+\d+)?$/i,
+  /\s+trailer$/i,
+  /\s+characters?$/i,
+  /\s+soundtrack$/i,
+  /\s+ending( explained)?$/i,
+  /\s+reviews?$/i,
+  /\s+imdb$/i,
+  /\s+netflix$/i,
+  /\s+watch\s+online$/i,
+  /\s+release\s+date$/i,
+  /\s+full\s+movie$/i,
+  /\(film\s*series\)/i,
+  /\(franchise\)/i,
+  /\(tv\s*series\)/i,
+  /\(film\)/i,
+  /\s+schedule$/i,
+  /\s+game(s)?(\s+today)?$/i,
+  /\s+score(s)?$/i,
+  /\s+roster$/i,
+  /\s+quarterback$/i,
+  /\s+qb$/i,
+  /\s+depth\s+chart$/i,
+  /\s+news$/i,
+  /\s+appliances$/i,
+  /\s+cookware$/i,
+  /\s+cruises?.*$/i,
+  /\s+vs\s+.*$/i,
+];
+
+const cleanTitle = s => {
+  let res = (s || '').trim();
+  for (const pat of STRIP_SUFFIXES) {
+    res = res.replace(pat, '').trim();
+  }
+  return res;
+};
+
+const extractSuggestion = (q, items) => {
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    return null;
+  }
+  const qLower = q.toLowerCase().trim();
+  const qWords = qLower.split(/\s+/);
+  const k = qWords.length;
+
+  // 1. Any mrk === 7 (direct spell-correction / autocorrect from Yahoo)
+  const spellItems = items.filter(it => it && it.mrk === 7);
+  for (const it of spellItems) {
+    const c = cleanTitle(it.key);
+    if (c.toLowerCase() !== qLower && c.length > 1) {
+      return c;
+    }
+  }
+
+  // 2. Check if suggestions share an inflection / plural / prefix variation of q
+  // e.g. 'viking' -> suggestions have 'vikings schedule', 'vikings cast' -> prefix is 'vikings'
+  // e.g. 'peaky blinder' -> 'peaky blinders cast' -> prefix is 'peaky blinders'
+  // e.g. 'stranger thing' -> 'stranger things cast' -> prefix is 'stranger things'
+  const prefixCounts = {};
+  for (const it of items) {
+    const c = cleanTitle(it.key);
+    const words = c.split(/\s+/);
+    if (words.length >= k) {
+      const pfx = words.slice(0, k).join(' ');
+      const pfxLower = pfx.toLowerCase();
+      if (pfxLower !== qLower) {
+        prefixCounts[pfx] = (prefixCounts[pfx] || 0) + 1;
+      }
+    }
+  }
+
+  let bestPfx = null;
+  let maxCount = 0;
+  for (const [pfx, count] of Object.entries(prefixCounts)) {
+    const pfxLower = pfx.toLowerCase();
+    const isClose =
+      pfxLower.startsWith(qLower) ||
+      qLower.startsWith(pfxLower) ||
+      Math.abs(pfxLower.length - qLower.length) <= 2;
+    if (isClose && count > maxCount) {
+      maxCount = count;
+      bestPfx = pfx;
+    }
+  }
+  if (bestPfx && maxCount >= 2) {
+    return bestPfx;
+  }
+
+  // 3. If there is a high-ranking item whose cleaned title is an edit-distance variant of q
+  for (const it of items.slice(0, 5)) {
+    const c = cleanTitle(it.key);
+    const cLower = c.toLowerCase();
+    if (
+      cLower !== qLower &&
+      (cLower.startsWith(qLower) || qLower.startsWith(cLower)) &&
+      Math.abs(cLower.length - qLower.length) <= 2
+    ) {
+      return c;
+    }
+  }
+
+  return null;
+};
 
 const SearchScreen = () => {
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -177,87 +287,59 @@ const SearchScreen = () => {
   }, [searchQuery, hasSearched]);
 
   const fetchSuggestion = async q => {
-    let cancelled = false;
+    const trimmed = (q || '').trim();
+    if (!trimmed) {
+      setSuggestion(null);
+      return null;
+    }
     setSuggestionLoading(true);
-    console.log('[suggestion] fetchSuggestion start', { q });
+    console.log('[suggestion] fetchSuggestion start', { q: trimmed });
     try {
-      const url = `https://search.yahoo.com/search?p=${encodeURIComponent(q)}`;
-      console.log('[suggestion] fetching URL', url);
-      const resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-      console.log('[suggestion] response status', resp && resp.status);
-      const html = await resp.text();
-      console.log('[suggestion] fetched html length', html ? html.length : 0);
-      // parse with jsdom-jscore-rn using the same `jsdom` helper pattern as SubtitleManager
-      let dom;
-      let doc = null;
+      const primaryUrl = `https://search.yahoo.com/sugg/gossip/gossip-us-ura/?command=${encodeURIComponent(
+        trimmed,
+      )}&output=json&nresults=20`;
+      const fallbackUrl = `https://ff.search.yahoo.com/gossip?output=json&command=${encodeURIComponent(
+        trimmed,
+      )}`;
+
+      let items = [];
       try {
-        dom = jsdom(html);
-        if (!dom) {
-          console.error('[suggestion] jsdom-jscore-rn: jsdom returned falsy dom');
-          return null;
+        const resp = await fetch(primaryUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0' },
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          items = data?.gossip?.results || [];
         }
-
-        if (dom.querySelector) {
-          doc = dom;
-        } else if (dom.window && dom.window.document) {
-          doc = dom.window.document;
-        } else if (dom.document) {
-          doc = dom.document;
-        }
-
-        if (!doc) {
-          console.error('[suggestion] unable to obtain document from parsed DOM', Object.keys(dom || {}));
-          return null;
-        }
-      } catch (parseErr) {
-        console.error('[suggestion] JSDOM parse error', parseErr && (parseErr.message || parseErr));
-        return null;
+      } catch (err) {
+        console.warn('[suggestion] primary endpoint failed, trying fallback', err);
       }
-      // Try a few selectors matching Yahoo's suggestion area (h4 first)
-      let el = doc.querySelector('ol.reg.searchSuperTop h4.text-module.u-strong');
-      console.log('[suggestion] querySelector primary', !!el);
-      if (!el) el = doc.querySelector('.searchSuperTop h4');
-      console.log('[suggestion] querySelector .searchSuperTop h4', !!el);
-      if (!el) el = doc.querySelector('h4.text-module.u-strong');
-      console.log('[suggestion] querySelector fallback h4.text-module.u-strong', !!el);
 
-      let text = null;
-      if (el) {
-        text = el.textContent.trim();
-        console.log('[suggestion] extracted text from h4', text);
-      } else {
-        // Fallback: look for <strong><i> inside .compTitle
+      if (!items || items.length === 0) {
         try {
-          let strongI = doc.querySelector('.compTitle .stxt a strong i');
-          console.log('[suggestion] .compTitle .stxt a strong i', !!strongI);
-          if (!strongI) strongI = doc.querySelector('.compTitle .stxt a strong');
-          console.log('[suggestion] .compTitle .stxt a strong', !!strongI);
-          if (!strongI) {
-            strongI = doc.querySelector('.compTitle .stxt a');
-            console.log('[suggestion] .compTitle .stxt a', !!strongI);
+          const resp = await fetch(fallbackUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0' },
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            items = data?.gossip?.results || [];
           }
-
-          if (strongI) {
-            text = strongI.textContent.trim();
-            console.log('[suggestion] extracted text from compTitle strong/i', text);
-          }
-        } catch (ex) {
-          console.warn('[suggestion] compTitle fallback error', ex);
+        } catch (err) {
+          console.warn('[suggestion] fallback endpoint failed', err);
         }
       }
 
-      // sanitize suggestion: remove common trailing qualifiers like "(film series)"
-      if (text && typeof text === 'string') {
-        text = text.replace(/\(film series\)/i, '').trim();
-        text = text.replace(/\(franchise\)/i, '').trim();
-      }
-      if (!cancelled) setSuggestion(text);
+      const text = extractSuggestion(trimmed, items);
+      console.log('[suggestion] extracted suggestion', text);
+      setSuggestion(text);
       return text;
+    } catch (e) {
+      console.error('[suggestion] error', e && (e.message || e));
+      setSuggestion(null);
+      return null;
     } finally {
-      if (!cancelled) {
-        setSuggestionLoading(false);
-        console.log('[suggestion] fetchSuggestion finished, suggestionLoading=false');
-      }
+      setSuggestionLoading(false);
+      console.log('[suggestion] fetchSuggestion finished, suggestionLoading=false');
     }
   };
 
